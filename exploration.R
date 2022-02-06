@@ -11,8 +11,9 @@ theme_set(theme_minimal())
 
 backup <- "./backup/"
 data <- read_csv(file = paste0(backup, "FrenchStocks.csv"))
-tickers <- data %>%
-  pull(Symbol)
+
+companies <- data %>%
+  select(c(Name, Symbol, Rank)) 
 
 date_breaks <- c("12m" = "1 month", 
                  "9m" = "1 month", 
@@ -42,15 +43,32 @@ get_start_date <- function(period){
   
 }
 
+get_tq_data <- function(company, num_months = 12){
+  "Return price data for given company and period."
+  
+  ticker <- companies %>%
+    filter(Name == company) %>%
+    pull(Symbol)
+  tq_get(x = ticker, 
+         get = "stock.prices", 
+         from = today() - months(num_months),
+         to = today(),
+         complete_cases = T)
+  
+}
+
 stock_evolution_plot <- function(
-  ticker, 
+  company, 
   price_data, 
   period = "12m"
 ){
-  "Return evolution plot for given stock and period."
+  "Return evolution plot for given company and period."
   
   start_date <- get_start_date(period = period)
-  title <- paste(ticker, "from", start_date, "to", today())
+  ticker <- companies %>%
+    filter(Name == company) %>%
+    pull(Symbol)
+  title <- paste(ticker, "(", company, ") from", start_date, "to", today())
   
   p <- price_data %>%
     filter(date >= start_date) %>%
@@ -68,14 +86,17 @@ stock_evolution_plot <- function(
 }
 
 candlestick_plot <- function(
-  ticker, 
+  company, 
   price_data,
   period = "12m"
 ){
-  "Return candlestick chart for given price data and period."
+  "Return candlestick chart for given company and period."
   
   start_date <- get_start_date(period = period)
-  title <- paste(ticker, "from", start_date, "to", today())
+  ticker <- companies %>%
+    filter(Name == company) %>%
+    pull(Symbol)
+  title <- paste(ticker, "(", company, ") from", start_date, "to", today())
   
   p <- price_data %>%
     filter(date >= start_date) %>%
@@ -113,13 +134,8 @@ candlestick_plot <- function(
 
 # ----- First manipulation -----
 
-ticker <- tickers[2]
-prices <- tq_get(x = ticker, 
-                 get = "stock.prices", 
-                 from = today() - months(12),
-                 to = today(),
-                 complete_cases = T)
-
+company <- "Dior"
+prices <- get_tq_data()
 stock_evolution_plot(ticker = ticker, price_data = prices)
 candlestick_plot(ticker = ticker, price_data = prices)
 
