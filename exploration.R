@@ -16,12 +16,12 @@ companies <- data %>%
 
 # ----- First manipulation -----
 
-company <- "Ubisoft"
+company <- "OVH Groupe"
 prices <- get_tq_data(company)
 stock_evolution_plot(company, 
                      price_data = prices, 
-                     period = "3m")
+                     period = "2w")
 candlestick_plot(company, 
                  price_data = prices, 
-                   period = "3m")
+                  period = "2w")
 
