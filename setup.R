@@ -16,6 +16,7 @@ short <- "purple"
 long <- "black"
 macd <- "#C47D72"
 rsi <- "#F3B0DE"
+pal <- "Set3"
 
 # ----- GGplot theme -----
 
@@ -49,6 +50,11 @@ get_ticker <- function(asset){
     pull(Symbol) 
 }
 
+get_asset_last_value <- function(ticker, assets_value){
+  "Return ticker's last value given its price and number of shares."
+  assets_value[assets_value$ticker == ticker,]$value %>% 
+    tail(1)
+}
 
 get_start_date <- function(period, price_data){
   "Return start date based on period."
@@ -103,15 +109,37 @@ get_tq_data <- function(tickers, num_months = 12){
     return(df_list)
   }
   
+}
+
+clean_assets_value <- function(assets_value){
+  "Modify assets value df for vizualisation."
   
+  tickers <- assets_value %>%
+    pull(ticker) %>%
+    unique()
+  labels <- lapply(
+    tickers,
+    function(ticker){
+      last_val <- get_asset_last_value(ticker, 
+                                        assets_value) %>%
+        round(1)
+      asset <- get_asset(ticker)
+      paste0(asset, " (", last_val, "$)")
+    }
+  ) %>% unlist()
+  names(labels) <- tickers
+  
+  assets_value %>%
+    mutate(ticker = revalue(ticker, labels))
+    
 }
 
 # ----- Portfolio Value -----
 
-get_portfolio_value <- function(data, num_shares){
-  "Return portfolio value given assets' prices and number of shares."
+compute_assets_value <- function(data, num_shares){
+  "Return assets' value given prices and number of shares."
   
-  dat <- lapply(
+  lapply(
     data, 
     function(df){
       ticker <- df %>%
@@ -123,10 +151,14 @@ get_portfolio_value <- function(data, num_shares){
   ) %>%
     bind_rows()
   
-  dat %>%
-    select(c(date, value)) %>%
-    group_by(date) %>%
-    summarize(value = sum(value))
+}
+
+get_portfolio_value <- function(assets_value){
+  "Return portfolio value given assets' prices and number of shares."
+  
+  assets_value %>%
+   group_by(date) %>%
+    summarise(value = sum(value))
   
 }
 
@@ -444,17 +476,38 @@ portfolio_evolution <- function(portfolio_data, title){
   
   plot_ly(portfolio_data) %>%
     add_trace(type = "scatter", 
-            mode = "lines",
-            marker = NULL,
-            x = ~date,
-            y = ~value,
-            line = list(color = evolution,
-                        width = 1.5)) %>%
+              mode = "lines",
+              marker = NULL,
+              x = ~date,
+              y = ~value,
+              line = list(color = evolution,
+                          width = 1.5)) %>%
     layout(title = title, 
            xaxis = list(rangeslider = list(visible = F), 
                         rangeselector = range_selector_period(y_pos = -.15), 
                         title = ""), 
            yaxis = list(title = "$")) 
+  
+}
+
+assets_value_evolution <- function(assets_value){
+  "Plot each asset's value evolution through time."
+  
+  p <- assets_value %>%
+    clean_assets_value() %>%
+    ggplot(aes(x = date, 
+               y = value, 
+               color = ticker)) +
+    geom_line(size = .5) +
+    scale_color_brewer(palette = pal) +
+    facet_wrap(~ ticker, 
+               scales = "free_y", 
+               nrow = 2, ncol = 5) +
+    labs(x = "", 
+         y = "Value ($)") +
+    theme(axis.text.x = element_text(angle = 45), 
+          legend.position = "none")
+  ggplotly(p) 
   
 }
 

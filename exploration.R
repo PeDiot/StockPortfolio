@@ -49,41 +49,15 @@ names(num_shares) <- selection %>%
 asset <- "OVH Groupe"
 prices <- get_tq_data(tickers[asset])
 
+assets_data <- get_tq_data(tickers = tickers)
 
-# ----- Portfolio Value -----
+# ----- Value per asset ------
 
-data <- tq_get(x = tickers, 
-               get = "stock.prices", 
-               from = today() - months(12),
-               to = today(),
-               complete_cases = T) 
-colnames(data)[1] <- "ticker" 
+assets_value <- compute_assets_value(data = assets_data, 
+                                     num_shares = num_shares)
 
-df_list <- split(data, data$ticker)
+assets_value_evolution(assets_value)
 
-dat <- lapply(
-  df_list, 
-  function(df){
-    asset <- df %>%
-      pull(ticker) %>%
-      unique() %>%
-      get_asset()
-    df %>%
-      mutate(value = close * num_shares[asset])
-  }
-) %>%
-  bind_rows()
-
-portfolio <- dat %>%
-  select(c(date, value)) %>%
-  group_by(date) %>%
-  summarize(value = sum(value))
-
-portfolio %>%
-  ggplot(aes(x = date, 
-             y = value)) +
-  geom_line()
- 
 
 # ----- Moving Average (MA) -----
 

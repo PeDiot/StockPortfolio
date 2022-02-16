@@ -3,18 +3,8 @@
 
 # ----- Setup -----
 
-library(tidyverse)
-library(data.table)
-
-library(shiny)
-library(shinydashboard)
-library(shinythemes)
-library(plotly)
-
-library(tidyquant)
-library(TTR)
-
-source("setup.R")
+source("Rpackages.R")
+source("setup.R", encoding = "UTF-8")
 
 # ----- Data -----
 
@@ -48,6 +38,7 @@ ui <- fluidPage(
   navbarPage("My Stock Portfolio", 
              theme = shinytheme("lumen"), 
              
+             # portfolio value
              tabPanel("Portfolio Value", 
                       fluid = TRUE, 
                       icon = icon("dollar"), 
@@ -72,13 +63,25 @@ ui <- fluidPage(
                         ), 
                         
                         mainPanel(
-                          plotlyOutput("portfolio_plot", 
-                                       height = 400, 
-                                       width = 900)
+                          tabsetPanel(
+                            tabPanel("Total value",
+                                     br(), 
+                                     br(), 
+                                     plotlyOutput("portfolio_plot", 
+                                                  height = 400, 
+                                                  width = 800)),
+                            tabPanel("Value per asset",
+                                     br(), 
+                                     br(), 
+                                     plotlyOutput("assets_value_plot", 
+                                                  height = 600, 
+                                                  width = 1000))
+                          )
                         )
                       )
              ),
              
+             # financial indicators 
              tabPanel("Financial Indicators", 
                       fluid = TRUE, 
                       icon = icon("calculator"), 
@@ -104,6 +107,7 @@ ui <- fluidPage(
                       
              ), 
              
+             # stock prediction
              tabPanel("Prediction", 
                       fluid = TRUE, 
                       icon = icon("chart-line")) 
@@ -140,11 +144,12 @@ server <- function(input, output) {
                       input$num_shares_OVH.PA,
                       input$num_shares_TFI.PA)
       names(num_shares) <- tickers
-      portfolio_data <- get_portfolio_value(data = assets_data, 
-                                            num_shares = num_shares)
+      assets_value <- compute_assets_value(data = assets_data, 
+                                           num_shares = num_shares)
+      portfolio_value <- get_portfolio_value(assets_value)
       
       title <- paste("Current value of the portfolio:", 
-                     portfolio_data[1, ] %>%
+                     portfolio_value[1, ] %>%
                        pull(value) %>%
                        round(2) %>%
                        format(big.mark = ",", 
@@ -153,10 +158,15 @@ server <- function(input, output) {
                      "$")
       
       output$portfolio_plot <- renderPlotly({
-        portfolio_data %>%
+        portfolio_value %>%
           portfolio_evolution(title = title)
       })
-    
+      
+      output$assets_value_plot <- renderPlotly({
+        assets_value %>%
+          assets_value_evolution()
+      })
+      
     }
   )
   
