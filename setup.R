@@ -16,7 +16,6 @@ short <- "purple"
 long <- "black"
 macd <- "#C47D72"
 rsi <- "#F3B0DE"
-pal <- "Set3"
 
 # ----- GGplot theme -----
 
@@ -75,33 +74,31 @@ get_start_date <- function(period, price_data){
   
 }
 
-get_title <- function(ticker, start_date){
-  "Make title."
+get_indicator_plot_title <- function(ticker, indicator_type){
+  "Make title ."
   asset <- get_asset(ticker)
-  title <- paste0(ticker, 
+  title <- paste0(asset, 
                  " (", 
-                 asset,
-                 "): ", 
-                 start_date, 
-                 " / ", 
-                 today())
+                 ticker,
+                 ") - ", 
+                 indicator_type)
   return(title)
 }
 
-get_tq_data <- function(tickers, num_months = 12){
+get_tq_data <- function(tickers, start_date){
   "Return price data for given asset and period."
   
   if (length(tickers) == 1){
     tq_get(x = tickers, 
            get = "stock.prices", 
-           from = today() - months(num_months),
+           from = start_date,
            to = today(),
            complete_cases = T)
   }
   else {
     dat <- tq_get(x = tickers, 
                   get = "stock.prices", 
-                  from = today() - months(num_months),
+                  from = start_date,
                   to = today(),
                   complete_cases = T)
     colnames(dat)[1] <- "ticker"  
@@ -111,26 +108,26 @@ get_tq_data <- function(tickers, num_months = 12){
   
 }
 
-clean_assets_value <- function(assets_value){
+clean_assets_value <- function(assets_value, portfolio_value){
   "Modify assets value df for vizualisation."
   
   tickers <- assets_value %>%
     pull(ticker) %>%
     unique()
-  labels <- lapply(
+  new_levels <- lapply(
     tickers,
     function(ticker){
       last_val <- get_asset_last_value(ticker, 
-                                        assets_value) %>%
-        round(1)
+                                        assets_value) 
+      contrib <- 100 * last_val / portfolio_value
       asset <- get_asset(ticker)
-      paste0(asset, " (", last_val, "$)")
+      paste0(asset, " (", round(contrib, 1), "%)")
     }
   ) %>% unlist()
-  names(labels) <- tickers
+  names(new_levels) <- tickers
   
   assets_value %>%
-    mutate(ticker = revalue(ticker, labels))
+    mutate(ticker = revalue(ticker, new_levels))
     
 }
 
@@ -145,8 +142,11 @@ compute_assets_value <- function(data, num_shares){
       ticker <- df %>%
         pull(ticker) %>%
         unique()
+      n <- nrow(df)
+      n_shares <- num_shares[ticker]
       df %>%
-        mutate(value = close * num_shares[ticker]) 
+        mutate(n_shares = rep(n_shares, n)) %>%
+        mutate(value = close * n_shares) 
     }
   ) %>%
     bind_rows()
@@ -161,6 +161,65 @@ get_portfolio_value <- function(assets_value){
     summarise(value = sum(value))
   
 }
+
+# ----- Assets performance -----
+
+compute_daily_returns <- function(assets_value){
+  "Calculate the daily returns and for our assets."
+  
+  assets_value %>%
+    group_by(ticker) %>%
+    tq_transmute(select = close,
+                 mutate_fun = periodReturn,
+                 period = "daily",
+                 col_rename = "ret") 
+  
+}
+
+compute_weighted_returns <- function(ret_data, num_shares){
+  "Calculate the weighted average of our asset returns."
+  
+  n_shares <- sum(num_shares)
+  wts_dat <- data.frame(ticker = names(num_shares), 
+                           num_shares = num_shares) %>%
+    mutate(wts = num_shares / n_shares)
+  
+  ret_data <- left_join(x = ret_data,
+                        y = wts_dat, 
+                        by = "ticker")
+  
+  ret_data %>%
+    mutate(wt_return = wts * ret)
+  
+}
+
+compute_cumulative_returns <- function(returns_data, ticker = NULL){
+  "Calculate the cumulative returns for the entire portfolio or a specific ticker. "
+  
+  if (is.null(ticker)){
+    cum_returns <- returns_data %>%
+      group_by(date) %>%
+      summarise(port_ret = sum(wt_return)) %>%
+      mutate(cr = cumprod(1 + port_ret)) %>%
+      mutate(move = case_when(cr > 1 ~ "Up", 
+                              TRUE ~ "Down") %>%
+               as.factor())
+  }
+  else{
+    returns_data <- returns_data[returns_data$ticker == ticker, ]
+    cum_returns <- returns_data %>%
+      group_by(date) %>%
+      summarise(port_ret = sum(wt_return)) %>%
+      mutate(cr = cumprod(1 + port_ret)) %>%
+      mutate(move = case_when(cr > 1 ~ "Up", 
+                              TRUE ~ "Down") %>%
+               as.factor())
+  }
+  
+  return(cum_returns)
+  
+}
+
 
 # ----- Financial indicators -----
 
@@ -304,7 +363,10 @@ get_rsi_signals <- function(
   
 }
 
+
 # ----- Data Viz -----
+
+# --- Plotly settings
 
 range_selector_period <- function(x_pos = .5, y_pos){
   "Plotly buttons to select period."
@@ -332,8 +394,205 @@ range_selector_period <- function(x_pos = .5, y_pos){
   
 }
 
-candlestick_chart <- function(price_data, legend_group = "one"){
-  "Build plotly candlestick chart for a given asset."
+plotly_legend <- function(x.pos = .5, y.pos = -.2, size = 12){
+  list(orientation = "h", x = x.pos, y = y.pos,
+       xanchor = "center", yref = "paper",
+       font = list(size = 12),
+       bgcolor = "transparent", 
+       borderwidth = .2)
+}
+
+plotly_layout <- function(p, title, title.y){
+  
+  p %>%
+    layout(title = title,
+           xaxis = list(rangeslider = list(visible = F), 
+                        rangeselector = range_selector_period(y_pos = -0.15), 
+                        title = ""),
+           yaxis = list(fixedrange = FALSE, 
+                        title = title.y),
+           legend = plotly_legend()) 
+}
+
+
+# --- Performance
+
+plot_cumulative_returns <- function(
+  plotly_obj, 
+  title, 
+  legend_group,
+  yaxis = NULL
+){
+  "Plot cumulative returns evolution."
+  
+  if (is.null(yaxis)){
+    p <- plotly_obj %>%
+      add_trace(type = "scatter", 
+                mode = "lines",
+                marker = NULL,
+                x = ~date,
+                y = ~cr,
+                name = "Cumulative returns", 
+                yaxis = yaxis, 
+                line = list(width = 1.7, 
+                            color = macd), 
+                legendgroup = legend_group) %>%
+      add_trace(type = "scatter", 
+                mode = "lines",
+                marker = NULL,
+                x = c(~min(date), ~max(date)),
+                y = c(1, 1), 
+                yaxis = yaxis, 
+                line = list(color = "black",
+                            width = 0.5,
+                            dash = "dot"), 
+                showlegend = F)
+  }
+  else{
+    p <- plotly_obj %>%
+      add_trace(type = "scatter", 
+                mode = "lines",
+                marker = NULL,
+                x = ~date,
+                y = ~cr,
+                name = "Cumulative returns", 
+                yaxis = yaxis, 
+                line = list(width = 1.7, 
+                            color = macd), 
+                legendgroup = legend_group) %>%
+      add_trace(type = "scatter", 
+                mode = "lines",
+                marker = NULL,
+                x = c(~min(date), ~max(date)),
+                y = c(1, 1), 
+                yaxis = yaxis, 
+                line = list(color = "black",
+                            width = 0.5,
+                            dash = "dot"), 
+                showlegend = F)
+  }
+  
+  return(p)
+  
+}
+
+plot_price_evolution <- function(
+  plotly_obj, 
+  title, 
+  legend_group, 
+  yaxis = NULL
+){
+  "Plot price evolution."
+
+  if (is.null(yaxis)){
+    p <- plotly_obj %>%
+      add_trace(type = "scatter", 
+                mode = "lines",
+                marker = NULL,
+                x = ~date,
+                y = ~value,
+                name = "Value ($)", 
+                line = list(color = evolution,
+                            width = 1.7), 
+                legendgroup = legend_group)
+  }
+  else{
+    p <- plotly_obj %>%
+      add_trace(type = "scatter", 
+                mode = "lines",
+                marker = NULL,
+                x = ~date,
+                y = ~value,
+                name = "Value ($)",
+                yaxis = yaxis, 
+                line = list(color = evolution,
+                            width = 1.7), 
+                legendgroup = legend_group)
+  }
+  
+  return(p)
+  
+  
+}
+
+# --- Portfolio
+
+portfolio_evolution <- function(portfolio_value, portfolio_returns){
+  
+  data <- merge(x = portfolio_value, 
+                y = portfolio_returns, 
+                by = "date") 
+  
+  plot_ly(data) %>%
+    plot_price_evolution(title = "", 
+                         legend_group = "one") %>%
+    plot_cumulative_returns(title = "", 
+                            yaxis = "y2", 
+                            legend_group = "two") %>%
+    layout(title = "Portfolio value and cumulative returns",
+           xaxis = list(rangeslider = list(visible = F), 
+                        rangeselector = range_selector_period(y_pos = -0.15), 
+                        title = ""),
+           yaxis = list(domain = c(0.55, 1),
+                        fixedrange = FALSE,
+                        tickfont = list(color = evolution), 
+                        title = "$"), 
+           yaxis2 = list(domain = c(0, 0.45),
+                         fixedrange = FALSE, 
+                         tickfont = list(color = macd), 
+                         title = ""), 
+           legend = plotly_legend())
+  
+}
+
+portfolio_composition <- function(assets_value){
+  "Return a pie chart with each asset's value."
+  
+  last_date <- max(assets_value$date)
+  d <- assets_value %>%
+    filter(date == last_date) %>%
+    mutate(ticker = as.factor(ticker)) %>%
+    mutate(asset = lapply(ticker, get_asset))
+  tot_val <- sum(d$value)
+  d <- d %>%
+    mutate(pct = 100 * value / tot_val)
+  
+  colors <- colorRampPalette(brewer.pal(9, "Blues"))(100)[d$pct]
+  
+  fig <- d %>%
+    plot_ly(labels = ~ticker, 
+            values = ~value, 
+            type = "pie", 
+            textposition = "inside",
+            textinfo = "label+percent",
+            insidetextfont = list(color = "black"),
+            hoverinfo = "text",
+            text = ~paste0(asset, " ($", value %>%
+                            round(2) %>%
+                            format(big.mark = ",", 
+                                   decimal.mark = ".", 
+                                   scientific = F), 
+                           ")"),
+            marker = list(colors = colors,
+                          line = list(color = "#FFFFFF", width = 1)),
+            showlegend = FALSE)
+  
+  options <- list(showgrid = FALSE,
+                  zeroline = FALSE, 
+                  showticklabels = FALSE)
+  title <- paste0("Contribution of each asset to the portfolio value as of ", 
+                  format(last_date, "%B %d, %Y"))
+  fig %>%
+    layout(title = title, 
+           xaxis = options,
+           yaxis = options)
+}
+
+# --- Indicators
+
+
+candlestick_chart <- function(ticker, price_data){
+  "Build plotly candlestick chart with moving averages for a given asset."
   
   p <- plot_ly(price_data) %>%
     add_trace(type = "candlestick",
@@ -346,80 +605,81 @@ candlestick_chart <- function(price_data, legend_group = "one"){
               increasing = list(line = list(color = high,
                                             width = 1.5)), 
               decreasing = list(line = list(color = low,
-                                            width = 1.5)), 
-              legendgroup = legend_group)
-}
-
-add_moving_averages_trace <- function(plot, legend_group = "one"){
-  "Add MA20 and MA50."
-  
-  plot %>%
+                                            width = 1.5))) %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
               x = ~date,
               y = ~MA20,
               name = "MA20",
-              yaxis = "y1", 
               line = list(color = short, 
-                          width = .7),
-              legendgroup = "one", 
-              hoverinfo = "none", 
-              legend_group = legend_group) %>%
+                          width = .8),
+              hoverinfo = "none") %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
               x = ~date,
               y = ~MA50,
               name = "MA50",
-              yaxis = "y1", 
               line = list(color = long, 
                           dash = "dot", 
-                          width = .7), 
-              legendgroup = legend_group)
+                          width = .8), 
+              hoverinfo = "none") 
+  
+  title <- get_indicator_plot_title(ticker, 
+                                    indicator_type = "Candlestick & Moving Averages")
+  p <- p %>%
+    plotly_layout(title = title, title.y = "$")
+  
+  return(p)
+    
+  
 }
 
-add_macd_trace <- function(plot, legend_group = "two"){
-  "Add MACD and MACD signal on a new chart."
+macd_chart <- function(ticker, price_data){
+  "Build plotly chart for MACD and MACD signal."
   
-  plot %>%
+  p <- plot_ly(price_data) %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
               x = ~date,
               y = ~MACD,
               name = "MACD",
-              yaxis = "y2", 
               line = list(color = macd,
-                          width = 1.3), 
-              legendgroup = legend_group) %>%
+                          width = 1.3)) %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
               x = ~date,
               y = ~Signal,
               name = "MACD Signal",
-              yaxis = "y2", 
               line = list(color = long,
                           width = 1,
                           dash = "dot"), 
-              legendgroup = legend_group) 
+              hoverinfo = "none")
+  
+  title <- get_indicator_plot_title(ticker, 
+                                    indicator_type = "Moving Average Convergence Divergence")
+  p <- p %>%
+    plotly_layout(title = title, title.y = "%")
+  
+  return(p)
+  
 }
 
-add_rsi_trace <- function(plot, legend_group = "three"){
-  "Add RSI signal and bounds on a new chart."
+rsi_chart <- function(ticker, price_data){
+  "Build plotly chart for RSI signal and bounds."
   
-  plot %>% 
+  p <- plot_ly(price_data) %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
               x = ~date,
               y = ~RSI,
               name = "RSI",
-              yaxis = "y3", 
               line = list(color = rsi,
-                          width = 1.5), 
-              legendgroup = legend_group) %>%
+                          width = 1.5)) %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
@@ -428,9 +688,8 @@ add_rsi_trace <- function(plot, legend_group = "three"){
               name = "Upper RSI (70)",
               line = list(color = "red",
                           width = 0.5,
-                          dash = "dot"),
-              yaxis = "y3", 
-              legendgroup = legend_group) %>%
+                          dash = "dot"), 
+              hoverinfo = "none") %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
@@ -439,96 +698,44 @@ add_rsi_trace <- function(plot, legend_group = "three"){
               name = "Lower RSI (30)",
               line = list(color = "red",
                           width = 0.5,
-                          dash = "dot"),
-              yaxis = "y3", 
-              legendgroup = legend_group) 
-}
-
-indicators_plot <- function(price_data, title){
-  "Make plotly layout."
-  price_data %>%
-    candlestick_chart() %>%
-    add_moving_averages_trace() %>%
-    add_macd_trace() %>% 
-    add_rsi_trace() %>%
-    layout(title = title,
-           xaxis = list(rangeslider = list(visible = F), 
-                        rangeselector = range_selector_period(y_pos = -0.055), 
-                        title = ""),
-           yaxis = list(domain = c(0.68, 1),
-                        fixedrange = FALSE, 
-                        title = "$"),
-           yaxis2 = list(domain = c(0.32, 0.58),
-                         fixedrange = FALSE, 
-                         title = "%"), 
-           yaxis3 = list(domain = c(0., 0.28),
-                         fixedrange = FALSE, 
-                         title = ""),
-           legend = list(orientation = "h", x = 0.5, y = -.07,
-                         xanchor = "center", yref = "paper",
-                         font = list(size = 12),
-                         bgcolor = "transparent", 
-                         borderwidth = .2)) 
-}
-
-portfolio_evolution <- function(portfolio_data, title){
-  "Plot portfolio value evolution."
+                          dash = "dot"), 
+              hoverinfo = "none")
   
-  plot_ly(portfolio_data) %>%
-    add_trace(type = "scatter", 
-              mode = "lines",
-              marker = NULL,
-              x = ~date,
-              y = ~value,
-              line = list(color = evolution,
-                          width = 1.5)) %>%
-    layout(title = title, 
-           xaxis = list(rangeslider = list(visible = F), 
-                        rangeselector = range_selector_period(y_pos = -.15), 
-                        title = ""), 
-           yaxis = list(title = "$")) 
+  title <- get_indicator_plot_title(ticker, 
+                                    indicator_type = "Relative Strength Index")
+  p <- p %>%
+    plotly_layout(title = title, title.y = "")
   
-}
-
-assets_value_evolution <- function(assets_value){
-  "Plot each asset's value evolution through time."
-  
-  p <- assets_value %>%
-    clean_assets_value() %>%
-    ggplot(aes(x = date, 
-               y = value, 
-               color = ticker)) +
-    geom_line(size = .5) +
-    scale_color_brewer(palette = pal) +
-    facet_wrap(~ ticker, 
-               scales = "free_y", 
-               nrow = 2, ncol = 5) +
-    labs(x = "", 
-         y = "Value ($)") +
-    theme(axis.text.x = element_text(angle = 45), 
-          legend.position = "none")
-  ggplotly(p) 
+  return(p)
   
 }
 
 # ----- UI -----
 
-num_shares_input <- function(asset1, asset2){
+num_shares_input <- function(
+  asset1, 
+  asset2, 
+  val1 = 1, 
+  val2 = 1
+){
   "Build shiny numeric input for number of shares."
   
   inputId1 <- paste("num_shares", get_ticker(asset1), sep = "_")
   inputId2 <- paste("num_shares", get_ticker(asset2), sep = "_")
+  if (asset2 == "OVH Groupe"){
+    asset2 <- "OVH"
+  }
   fluidRow(
     column(width = 6, 
            numericInput(inputId1,
                         label = h5(asset1), 
                         min = 0, 
-                        value = 1)), 
+                        value = val1)), 
     column(width = 6,
            numericInput(inputId2, 
                         label = h5(asset2), 
                         min = 0, 
-                        value = 1))
+                        value = val2))
   )
 }
   
