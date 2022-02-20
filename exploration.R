@@ -2,16 +2,12 @@
 
 # ----- Setup -----
 
-library(tidyquant)        # retrieve financial data from Yahoo Finance API
-library(tidyverse)
-library(data.table)
-library(ggplot2)
-library(plotly)
-library(TTR)
+source("Rpackages.R")
 
 theme_set(theme_minimal())
 
-source("setup.R")
+source("setup.R", 
+       encoding = "UTF-8")
 
 assets <- c("LVMH",  
             "Air Liquide",
@@ -47,17 +43,57 @@ names(num_shares) <- selection %>%
   pull(Symbol)
 
 asset <- "OVH Groupe"
-prices <- get_tq_data(tickers[asset])
+ticker <- get_ticker(asset)
+prices <- get_tq_data(ticker)
 
-assets_data <- get_tq_data(tickers = tickers)
+assets_data <- get_tq_data(tickers = tickers, 
+                           start_date = "2021-09-01")
 
 # ----- Value per asset ------
 
 assets_value <- compute_assets_value(data = assets_data, 
                                      num_shares = num_shares)
 
-assets_value_evolution(assets_value)
+portfolio_data <- get_portfolio_value(assets_value) 
 
+ret_data <- assets_value %>%
+  compute_daily_returns() %>%
+  compute_weighted_returns(num_shares = num_shares) 
+
+port_ret <- ret_data %>%
+  compute_cumulative_returns()
+
+data <- merge(x = portfolio_data, 
+              y = port_ret, 
+              by = "date") 
+
+ay <- list(
+  tickfont = list(color = macd),
+  titlefont = list(color = macd),
+  overlaying = "y",
+  side = "right",
+  title = "Cumulative returns"
+)
+
+plot_ly(data) %>%
+  plot_price_evolution(title = "") %>%
+  plot_cumulative_returns(title = "", 
+                          yaxis = "y2") %>%
+  layout(title = "Portfolio value and cumulative returns",
+         xaxis = list(rangeslider = list(visible = F), 
+                      rangeselector = range_selector_period(y_pos = -0.15), 
+                      title = ""),
+         yaxis = list(tickfont = list(color = evolution), 
+                      title = ""), 
+         yaxis2 = ay)
+
+ticker <- get_ticker("OVH Groupe")
+
+ret_data %>%
+  compute_cumulative_returns(ticker = ticker) %>%
+  View()
+
+portfolio_cumulative_returns(port_ret)
 
 # ----- Moving Average (MA) -----
 
@@ -94,15 +130,12 @@ prices <- prices %>%
 
 start_date <- get_start_date(period = "24m", 
                              price_data = prices)
-title <- get_title(asset = asset, 
-                   start_date = start_date)
 
-p <- prices %>%
-  candlestick_chart() %>%
-  add_moving_averages_trace() %>%
-  add_macd_trace() %>% 
-  add_rsi_trace() %>%
-  add_layout(title = title)
+prices %>%
+  candlestick_chart(ticker = ticker) 
 
-p
+prices %>%
+  macd_chart(ticker = ticker)
 
+prices %>%
+  rsi_chart(ticker = ticker)
