@@ -1,6 +1,7 @@
 library(tidyverse)
 library(data.table)
 library(plyr)
+library(stringr)
 
 library(shiny)
 library(shinydashboard)
