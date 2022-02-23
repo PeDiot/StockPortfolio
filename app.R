@@ -29,22 +29,26 @@ tickers <- selection %>%
 names(tickers) <- selection %>%
   pull(Name) 
 
-# ----- User Interface -----
+# ---------- User Interface ----------
 
 ui <- fluidPage(
   
   useShinydashboard(), 
+  html_dependency_awesome(),
+  
+  tags$head(tags$style(infoBox_dims())),
   
   navbarPage("My Stock Portfolio", 
              theme = shinytheme("lumen"), 
              
-             # portfolio value
+             # portfolio value -----
              tabPanel("Portfolio Value", 
                       fluid = TRUE, 
                       icon = icon("dollar"), 
                       
                       sidebarLayout(
                         
+                        # inputs 
                         sidebarPanel(
                           
                           width = 3, 
@@ -78,20 +82,40 @@ ui <- fluidPage(
                           
                           tabsetPanel(
                             
+                            # portfolio overview 
                             tabPanel("Overview",
                                      br(), 
+                                     h4(paste("Your stats as of", 
+                                              format(Sys.Date(), "%B %d, %Y")), 
+                                        align = "center"),
+                                     br(),
+                                     fluidRow(column(width = 2), 
+                                              infoBoxOutput("port_current_val"),
+                                              column(width = 1), 
+                                              infoBoxOutput("port_current_cumret")), 
                                      br(), 
-                                     plotlyOutput("portfolio_evolution", 
-                                                  height = 600, 
-                                                  width = 800)
-                                     ),
+                                     div(plotlyOutput("portfolio_evolution", 
+                                                      height = 600, 
+                                                      width = 700),
+                                         align = "center")),
                             
+                            # portfolio composition
                             tabPanel("Composition",
                                      br(), 
+                                     h4(paste( "Contribution of each asset to the portfolio value as of",
+                                              format(Sys.Date(), "%B %d, %Y") ), 
+                                        align = "center"),
+                                     div(plotlyOutput("portfolio_composition", 
+                                                      height = 400, 
+                                                      width = 800), 
+                                         align = "center"), 
+                                     br(),
+                                     h4("Your best and worst assets", align = "center"),
                                      br(), 
-                                     plotlyOutput("portfolio_composition", 
-                                                  height = 400, 
-                                                  width = 800))
+                                     fluidRow(column(width = 2), 
+                                              infoBoxOutput("best_asset_cumret"),
+                                              column(width = 1), 
+                                              infoBoxOutput("worst_asset_cumret"))) 
                           )
                           
                         )
@@ -100,13 +124,15 @@ ui <- fluidPage(
                       
              ),
              
-             # financial indicators 
+             # financial indicators -----
+             
              tabPanel("Financial Indicators", 
                       fluid = TRUE, 
                       icon = icon("calculator"), 
                       
                       sidebarLayout(
                         
+                        # inputs
                         sidebarPanel(
                           width = 3, 
                           selectInput("ticker", 
@@ -116,6 +142,7 @@ ui <- fluidPage(
                           
                         ),
                         
+                        # financial data viz 
                         mainPanel( 
                           tabsetPanel(
                             tabPanel("Candlestick",
@@ -124,6 +151,7 @@ ui <- fluidPage(
                                      plotlyOutput("candlestick_plot", 
                                                   height = 400, 
                                                   width = 800)),
+                            
                             tabPanel("MACD",
                                      br(), 
                                      br(), 
@@ -172,12 +200,15 @@ server <- function(input, output) {
     {
       
       
-      # yahoo finance data ---
+      # --- yahoo finance data ---
       assets_data <- get_tq_data(tickers = tickers, 
                                  start_date = input$first_buy_date) 
       
       
-      # portfolio ---
+      
+      # --- portfolio ---
+      
+      # inputs ---
       num_shares <- c(input$num_shares_LVMUY,
                       input$num_shares_OR.PA,
                       input$num_shares_AI.PA,
@@ -191,32 +222,72 @@ server <- function(input, output) {
       
       names(num_shares) <- tickers
       
-      # values 
+      # value ---
       assets_value <- compute_assets_value(data = assets_data, 
                                            num_shares = num_shares)
-      portfolio_value <- get_portfolio_value(assets_value)
+      port_value <- get_portfolio_value(assets_value)
       
-      # returns 
-      returns_data <- assets_value %>%
+      output$port_current_val <- renderInfoBox({
+        val <- get_portfolio_current_value(port_value) 
+        infoBox(title = "Current value",
+                value = val,
+                color = "light-blue", 
+                icon = tags$i(class = "fas fa-dollar-sign", 
+                              style = "font-size: 20px"), 
+                fill = F)
+        
+      })
+      
+      # cumulative returns
+      returns <- assets_value %>%
         compute_daily_returns() %>%
         compute_weighted_returns(num_shares = num_shares) 
       
-      portfolio_returns <- ret_data %>%
+      port_cumret <- returns %>%
         compute_cumulative_returns()
-     
-      # plots
+      
+      # data viz
       output$portfolio_evolution <- renderPlotly({
-        portfolio_evolution(portfolio_value, 
-                            portfolio_returns)
+        portfolio_evolution(port_value, 
+                            port_cumret)
       })
       
+      output$port_current_cumret <- renderInfoBox({
+        last_cumret <- get_current_cumret(port_cumret)
+        infoBox_port_cumret(last_cumret)
+      })
+      
+      # composition ---
+      
+      # current date
+      output$current_date <- renderText({
+        current_date <- max(assets_value$date)
+        format(current_date, "%B %d, %Y")
+      })
+      
+      # cumulative returns 
+      assets_cumret <- returns %>%
+        compute_cumulative_returns(all = F)
+      
+      # data viz 
       output$portfolio_composition <- renderPlotly({
         assets_value %>%
           portfolio_composition()
       })
       
+      output$best_asset_cumret <- renderInfoBox({
+        best_asset <- get_best_asset(assets_cumret) 
+        infoBox_asset_cumret(best_asset, type = "best")
+      })
       
-      # financial indicators ---
+      output$worst_asset_cumret <- renderInfoBox({
+        worst_asset <- get_worst_asset(assets_cumret) 
+        infoBox_asset_cumret(worst_asset, type = "worst")
+      })
+      
+      
+      
+      # --- financial indicators ---
       prices <- assets_data[[input$ticker]] %>%
         add_moving_avg(window = 20) %>%
         add_moving_avg(window = 50) %>%
