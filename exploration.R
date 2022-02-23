@@ -63,6 +63,9 @@ ret_data <- assets_value %>%
 port_ret <- ret_data %>%
   compute_cumulative_returns()
 
+assets_cumret <- ret_data %>%
+  compute_cumulative_returns(all= F)
+
 data <- merge(x = portfolio_data, 
               y = port_ret, 
               by = "date") 
