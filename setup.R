@@ -55,24 +55,6 @@ get_asset_last_value <- function(ticker, assets_value){
     tail(1)
 }
 
-get_start_date <- function(period, price_data){
-  "Return start date based on period."
-  
-  if ("w" %in% period){
-    start_date <- today() - weeks(periods[period])
-  }
-  else {
-    start_date <- today() - months(periods[period])
-  }
-  min_date <- price_data %>%
-    pull(date) %>%
-    min()
-  if (start_date < min_date){
-    return(min_date)
-  }
-  else{ return(start_date) }
-  
-}
 
 get_indicator_plot_title <- function(ticker, indicator_type){
   "Make title ."
@@ -131,6 +113,21 @@ clean_assets_value <- function(assets_value, portfolio_value){
     
 }
 
+cumret_to_percent <- function(cr){
+  "Convert floating cumulative return to percent."
+  
+  if (cr >= 1){
+    pct_cr <- 100*(cr - 1) %>%
+      round(2)
+  }
+  else{
+    pct_cr <- - 100*(1 - cr) %>%
+      round(2)
+  }
+  return(pct_cr)
+  
+}
+
 # ----- Portfolio Value -----
 
 compute_assets_value <- function(data, num_shares){
@@ -157,10 +154,26 @@ get_portfolio_value <- function(assets_value){
   "Return portfolio value given assets' prices and number of shares."
   
   assets_value %>%
-   group_by(date) %>%
+    group_by(ticker) %>%
+    complete(date = seq.Date(min(date), max(date), by="day")) %>%
+    fill(value) %>%
+    group_by(date) %>%
     summarise(value = sum(value))
   
 }
+
+get_portfolio_current_value <- function(portfolio_value){
+  "Return portfolio value at last date." 
+  
+  portfolio_value %>%
+    filter(date == max(date)) %>%
+    pull(value) %>%
+    round(2) %>%
+    format(big.mark = ",", 
+           decimal.mark = ".", 
+           scientific = F)
+}
+
 
 # ----- Assets performance -----
 
@@ -168,6 +181,9 @@ compute_daily_returns <- function(assets_value){
   "Calculate the daily returns and for our assets."
   
   assets_value %>%
+    group_by(ticker) %>%
+    complete(date = seq.Date(min(date), max(date), by="day")) %>%
+    fill(value) %>%
     group_by(ticker) %>%
     tq_transmute(select = close,
                  mutate_fun = periodReturn,
@@ -193,11 +209,11 @@ compute_weighted_returns <- function(ret_data, num_shares){
   
 }
 
-compute_cumulative_returns <- function(returns_data, ticker = NULL){
+compute_cumulative_returns <- function(ret_data, all = T){
   "Calculate the cumulative returns for the entire portfolio or a specific ticker. "
   
-  if (is.null(ticker)){
-    cum_returns <- returns_data %>%
+  if (all == T){
+    cum_returns <- ret_data %>%
       group_by(date) %>%
       summarise(port_ret = sum(wt_return)) %>%
       mutate(cr = cumprod(1 + port_ret)) %>%
@@ -206,17 +222,52 @@ compute_cumulative_returns <- function(returns_data, ticker = NULL){
                as.factor())
   }
   else{
-    returns_data <- returns_data[returns_data$ticker == ticker, ]
-    cum_returns <- returns_data %>%
-      group_by(date) %>%
-      summarise(port_ret = sum(wt_return)) %>%
-      mutate(cr = cumprod(1 + port_ret)) %>%
+    cum_returns <- ret_data %>%
+      group_by(ticker) %>%
+      mutate(cr = cumprod(1 + wt_return)) %>%
       mutate(move = case_when(cr > 1 ~ "Up", 
                               TRUE ~ "Down") %>%
                as.factor())
   }
   
   return(cum_returns)
+  
+}
+
+get_current_cumret <- function(cumret_data){
+  "Return cumulative returns at last date." 
+  
+  last_cr <- cumret_data %>%
+    filter(date == max(date)) %>%
+    pull(cr) %>%
+    cumret_to_percent()
+  return(last_cr)
+    
+}
+
+get_best_asset <- function(assets_cumret){
+  "Return asset with best cumulative returns as of today."
+  
+  d <- assets_cumret %>% 
+    filter(date == max(date)) %>% 
+    ungroup() %>% 
+    filter(cr == max(cr))
+  l <- list(asset = get_asset(d$ticker), 
+            pct_cr = cumret_to_percent(d$cr))
+  return(l) 
+  
+}
+
+get_worst_asset <- function(assets_cumret){
+  "Return asset with worst cumulative returns as of today."
+  
+  d <- assets_cumret %>% 
+    filter(date == max(date)) %>% 
+    ungroup() %>% 
+    filter(cr == min(cr))
+  l <- list(asset = get_asset(d$ticker), 
+            pct_cr = cumret_to_percent(d$cr))
+  return(l) 
   
 }
 
@@ -529,7 +580,7 @@ portfolio_evolution <- function(portfolio_value, portfolio_returns){
     plot_cumulative_returns(title = "", 
                             yaxis = "y2", 
                             legend_group = "two") %>%
-    layout(title = "Portfolio value and cumulative returns",
+    layout(title = "",
            xaxis = list(rangeslider = list(visible = F), 
                         rangeselector = range_selector_period(y_pos = -0.15), 
                         title = ""),
@@ -548,9 +599,8 @@ portfolio_evolution <- function(portfolio_value, portfolio_returns){
 portfolio_composition <- function(assets_value){
   "Return a pie chart with each asset's value."
   
-  last_date <- max(assets_value$date)
   d <- assets_value %>%
-    filter(date == last_date) %>%
+    filter(date == max(date)) %>%
     mutate(ticker = as.factor(ticker)) %>%
     mutate(asset = lapply(ticker, get_asset))
   tot_val <- sum(d$value)
@@ -580,10 +630,8 @@ portfolio_composition <- function(assets_value){
   options <- list(showgrid = FALSE,
                   zeroline = FALSE, 
                   showticklabels = FALSE)
-  title <- paste0("Contribution of each asset to the portfolio value as of ", 
-                  format(last_date, "%B %d, %Y"))
   fig %>%
-    layout(title = title, 
+    layout(title = "", 
            xaxis = options,
            yaxis = options)
 }
@@ -711,6 +759,71 @@ rsi_chart <- function(ticker, price_data){
 }
 
 # ----- UI -----
+
+infoBox_dims <- function(
+  box_height = "35px",
+  icon_height = "45px", 
+  icon_line_height = "35px"
+){
+  "Define dimensions for infoBox."
+  
+  dims <- paste0(".info-box {min-height: ",
+                 box_height,
+                 ";} .info-box-icon {height:",
+                 icon_height,
+                 "; line-height:", 
+                 icon_line_height, 
+                 ";} .info-box-content {padding-top: 0px; padding-bottom: 0px;}")
+  return(dims)
+} 
+
+infoBox_port_cumret <- function(last_cr){
+  "Return infoBox for current cumulative returns."
+  
+  if (last_cr < 0){
+    ib <- infoBox(title = "Cumulative returns", 
+                  value = paste("-", abs(last_cr)), 
+                  icon = tags$i(class = "fas fa-percent", 
+                                style="font-size: 20px"), 
+                  color = "red", 
+                  fill = F)
+  }
+  else{
+    ib <- infoBox(title = "Cumulative returns", 
+                  value = paste("+", last_cr), 
+                  icon = tags$i(class = "fas fa-percent", 
+                                style="font-size: 20px"), 
+                  color = "green", 
+                  fill = F)
+  }
+  return(ib)
+}
+
+infoBox_asset_cumret <- function(asset, type = "best"){
+  "Return infoBox to display best asset's cumulative returns."
+  
+  val <- ifelse(asset$pct_cr > 0, 
+                paste("+", asset$pct_cr), 
+                paste("-", abs(asset$pct_cr)))
+  
+  if (type == "best"){
+    icon <- tags$i(class = "fas fa-arrow-up", 
+                  style="font-size: 20px")
+    color <- "green"
+  }
+  if (type == "worst"){
+    icon <- tags$i(class = "fas fa-arrow-down", 
+                  style="font-size: 20px")
+    color <- "red"
+  }
+  
+  infoBox(title = asset$asset, 
+          value = paste0(val, "%"),  
+          icon = icon, 
+          color = color, 
+          fill = F)
+  
+}
 
 num_shares_input <- function(
   asset1, 
