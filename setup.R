@@ -1,6 +1,4 @@
-# --------- Setup for Financial Analysis --------
-
-options(warn=-1) # turn warnings off
+options(warn = -1)
 
 # ----- French companies data -----
 backup <- "./backup/"
@@ -12,9 +10,11 @@ french_stocks <- read_csv(file = paste0(backup, "FrenchStocks.csv"),
 evolution <- "#709ABE"
 high <- "Forest Green"
 low <- "Red"
-short <- "purple"
+short <- "#72C4D7"
+medium <- "purple"
 long <- "black"
 macd <- "#C47D72"
+macdHist <- "#B5CDD2"
 rsi <- "#F3B0DE"
 
 # ----- GGplot theme -----
@@ -330,14 +330,14 @@ add_macd <- function(
   "Return MACD and signal values for given period and prices."
   
   if (percent == T){
-    macd <- MACD(x = price_data %>% pull(close), 
+    macd_ <- MACD(x = price_data %>% pull(close), 
                  nFast = ema_short, 
                  nSlow = ema_long, 
                  nSig = signal, 
                  percent = T)
   }
   else{
-    macd <- MACD(x = price_data %>% pull(close), 
+    macd_ <- MACD(x = price_data %>% pull(close), 
                  nFast = ema_short, 
                  nSlow = ema_long, 
                  nSig = signal, 
@@ -345,8 +345,9 @@ add_macd <- function(
   }
   
   price_data %>%
-    mutate(MACD = macd[, 1], 
-           Signal = macd[, 2])
+    mutate(MACD = macd_[, 1], 
+           MACDSignal = macd_[, 2], 
+           MACDHist = MACD - MACDSignal)
   
 }
 
@@ -354,7 +355,7 @@ get_macd_signals <- function(price_data){
   "Identify buying and selling signals from MACD."
   
   col_names <- colnames(price_data)
-  if ("MACD" %in% col_names & "Signal" %in% col_names){
+  if ("MACD" %in% col_names & "MACDSignal" %in% col_names){
     price_data %>%
       mutate(
         MACDBuy = case_when(
@@ -661,7 +662,7 @@ candlestick_chart <- function(ticker, price_data){
               y = ~MA20,
               name = "MA20",
               line = list(color = short, 
-                          width = .8),
+                          width = 1),
               hoverinfo = "none") %>%
     add_trace(type = "scatter", 
               mode = "lines",
@@ -669,10 +670,19 @@ candlestick_chart <- function(ticker, price_data){
               x = ~date,
               y = ~MA50,
               name = "MA50",
+              line = list(color = medium,
+                          width = 1), 
+              hoverinfo = "none") %>%
+    add_trace(type = "scatter", 
+              mode = "lines",
+              marker = NULL,
+              x = ~date,
+              y = ~MA100,
+              name = "MA100",
               line = list(color = long, 
                           dash = "dot", 
-                          width = .8), 
-              hoverinfo = "none") 
+                          width = 1), 
+              hoverinfo = "none")
   
   title <- get_indicator_plot_title(ticker, 
                                     indicator_type = "Candlestick & Moving Averages")
@@ -687,7 +697,17 @@ candlestick_chart <- function(ticker, price_data){
 macd_chart <- function(ticker, price_data){
   "Build plotly chart for MACD and MACD signal."
   
-  p <- plot_ly(price_data) %>%
+  p <- price_data %>%
+    select(c(date, 
+             close, 
+             MACD, 
+             MACDSignal, 
+             MACDHist)) %>%
+    rename(value = close) %>%
+    plot_ly() %>%
+    plot_price_evolution(title = "", 
+                         legend_group = "one", 
+                         yaxis = "y1") %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
@@ -695,22 +715,46 @@ macd_chart <- function(ticker, price_data){
               y = ~MACD,
               name = "MACD",
               line = list(color = macd,
-                          width = 1.3)) %>%
+                          width = 1.3), 
+              legend_group = "two", 
+              yaxis = "y2") %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
               x = ~date,
-              y = ~Signal,
+              y = ~MACDSignal,
               name = "MACD Signal",
               line = list(color = long,
                           width = 1,
                           dash = "dot"), 
-              hoverinfo = "none")
+              hoverinfo = "none", 
+              legend_group = "two", 
+              yaxis = "y2") %>%
+    add_trace(type = "bar", 
+              x = ~date,
+              y = ~MACDHist,
+              name = "MACD Histogram",
+              marker = list(color = macdHist),
+              hoverinfo = "none", 
+              legend_group = "two", 
+              yaxis = "y2")
   
   title <- get_indicator_plot_title(ticker, 
-                                    indicator_type = "Moving Average Convergence Divergence")
+                                    indicator_type = "Prices & Moving Average Convergence Divergence")
   p <- p %>%
-    plotly_layout(title = title, title.y = "%")
+    layout(title = title,
+         xaxis = list(rangeslider = list(visible = F), 
+                      rangeselector = range_selector_period(y_pos = -0.15), 
+                      title = ""),
+         yaxis = list(domain = c(0.55, 1),
+                      fixedrange = FALSE,
+                      tickfont = list(color = evolution), 
+                      title = "$"), 
+         yaxis2 = list(domain = c(0, 0.45),
+                       fixedrange = FALSE, 
+                       tickfont = list(color = macd), 
+                       title = "%"), 
+         legend = plotly_legend())
   
   return(p)
   
@@ -719,7 +763,15 @@ macd_chart <- function(ticker, price_data){
 rsi_chart <- function(ticker, price_data){
   "Build plotly chart for RSI signal and bounds."
   
-  p <- plot_ly(price_data) %>%
+  p <- price_data %>%
+    select(c(date, 
+             close, 
+             RSI)) %>%
+    rename(value = close) %>%
+    plot_ly() %>%
+    plot_price_evolution(title = "", 
+                         legend_group = "one", 
+                         yaxis = "y1") %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
@@ -727,7 +779,9 @@ rsi_chart <- function(ticker, price_data){
               y = ~RSI,
               name = "RSI",
               line = list(color = rsi,
-                          width = 1.5)) %>%
+                          width = 1.5), 
+              legend_group = "two",  
+              yaxis = "y2") %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
@@ -737,7 +791,9 @@ rsi_chart <- function(ticker, price_data){
               line = list(color = "red",
                           width = 0.5,
                           dash = "dot"), 
-              hoverinfo = "none") %>%
+              hoverinfo = "none",  
+              legend_group = "two", 
+              yaxis = "y2") %>%
     add_trace(type = "scatter", 
               mode = "lines",
               marker = NULL,
@@ -747,12 +803,26 @@ rsi_chart <- function(ticker, price_data){
               line = list(color = "red",
                           width = 0.5,
                           dash = "dot"), 
-              hoverinfo = "none")
+              hoverinfo = "none", 
+              legend_group = "two",  
+              yaxis = "y2")
   
   title <- get_indicator_plot_title(ticker, 
-                                    indicator_type = "Relative Strength Index")
+                                    indicator_type = "Prices & Relative Strength Index")
   p <- p %>%
-    plotly_layout(title = title, title.y = "")
+    layout(title = title,
+           xaxis = list(rangeslider = list(visible = F), 
+                        rangeselector = range_selector_period(y_pos = -0.15), 
+                        title = ""),
+           yaxis = list(domain = c(0.55, 1),
+                        fixedrange = FALSE,
+                        tickfont = list(color = evolution), 
+                        title = "$"), 
+           yaxis2 = list(domain = c(0, 0.45),
+                         fixedrange = FALSE, 
+                         tickfont = list(color = rsi), 
+                         title = ""), 
+           legend = plotly_legend())
   
   return(p)
   
