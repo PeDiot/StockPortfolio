@@ -42,12 +42,10 @@ num_shares <- c(5,
 names(num_shares) <- selection %>%
   pull(Symbol)
 
-asset <- "OVH Groupe"
-ticker <- get_ticker(asset)
-prices <- get_tq_data(ticker)
-
-assets_data <- get_tq_data(tickers = tickers, 
+system.time(
+  assets_data <- get_tq_data(tickers = tickers, 
                            start_date = "2021-09-01")
+)
 
 # ----- Value per asset ------
 
@@ -98,12 +96,18 @@ ret_data %>%
 
 portfolio_cumulative_returns(port_ret)
 
+
 # ----- Moving Average (MA) -----
+
+asset <- "OVH Groupe"
+ticker <- get_ticker(asset = asset)
+prices <- assets_data[[ticker]]
 
 # add short-term MA (MA20) and long-run MA (MA50)
 prices <- prices %>%
   add_moving_avg(window = 20) %>%
   add_moving_avg(window = 50) %>%
+  add_moving_avg(window = 100) %>%
   get_ma_signals()
 
 # Strategy:
@@ -118,8 +122,7 @@ prices <- prices %>%
 # Strategy: buy (sell) when MACD crosses above (below) the signal line 
 
 prices <- prices %>%
-  add_macd() %>%
-  get_macd_signals()
+  add_macd()
 
 
 # ----- Relative Strength Index (RSI) -----
@@ -131,9 +134,6 @@ prices <- prices %>%
 
 # ----- Using plotly -----
 
-start_date <- get_start_date(period = "24m", 
-                             price_data = prices)
-
 prices %>%
   candlestick_chart(ticker = ticker) 
 
@@ -142,3 +142,23 @@ prices %>%
 
 prices %>%
   rsi_chart(ticker = ticker)
+
+p <- prices  %>%
+  select(c(date, 
+           close, 
+           macd, 
+           signal, 
+           macd_hist)) %>%
+  rename(value = close) %>%
+  plot_ly() %>%
+  add_trace(type = "scatter", 
+            mode = "lines",
+            marker = NULL,
+            x = ~date,
+            y = ~RSI,
+            name = "RSI",
+            line = list(color = rsi,
+                        width = 1.5), 
+            legend_group = "two",  
+            yaxis = "y2")
+p
