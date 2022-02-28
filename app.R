@@ -69,10 +69,9 @@ ui <- fluidPage(
                                            asset2 = "OVH Groupe", 
                                            val2 = 5), 
                           br(), 
-                          h4("When did you buy your first asset?"), 
                           dateInput(inputId = "first_buy_date",
-                                    label = "",
-                                    width = "100px",  
+                                    label = h4("Enter your start date"),
+                                    width = "200px",  
                                     value = "2021-09-01",
                                     max = Sys.Date(),
                                     format = "yyyy-mm-dd")

@@ -608,8 +608,12 @@ portfolio_composition <- function(assets_value){
   d <- d %>%
     mutate(pct = 100 * value / tot_val)
   
-  colors <- colorRampPalette(brewer.pal(9, "Blues"))(100)[d$pct]
-  
+  gradient <- colorRampPalette(c("#C9E4EA", "#567FA4"))
+  numeric_cut <- cut(d$pct, breaks = nrow(d)) %>%
+    as.numeric()
+  d <- d %>%
+    mutate( colors = gradient(nrow(d))[numeric_cut] )
+ 
   fig <- d %>%
     plot_ly(labels = ~ticker, 
             values = ~value, 
@@ -624,7 +628,7 @@ portfolio_composition <- function(assets_value){
                                    decimal.mark = ".", 
                                    scientific = F), 
                            ")"),
-            marker = list(colors = colors,
+            marker = list(colors = ~ colors, 
                           line = list(color = "#FFFFFF", width = 1)),
             showlegend = FALSE)
   
