@@ -88,14 +88,6 @@ plot_ly(data) %>%
                       title = ""), 
          yaxis2 = ay)
 
-ticker <- get_ticker("OVH Groupe")
-
-ret_data %>%
-  compute_cumulative_returns(ticker = ticker) %>%
-  View()
-
-portfolio_cumulative_returns(port_ret)
-
 
 # ----- Moving Average (MA) -----
 

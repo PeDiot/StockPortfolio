@@ -1,4 +1,6 @@
 # Setup -------------------------------------------------------------------
+dir <- "C:/Users/pemma/OneDrive - Université de Tours/Mécen/M2/S2/02 - Big Data/Project/StockPortfolio"
+setwd(dir) 
 
 source("Rpackages.R")
 source("setup.R",
@@ -6,26 +8,25 @@ source("setup.R",
 
 # Data --------------------------------------------------------------------
 
-assets <- c("LVMH",  
-            "Air Liquide",
-            "L'Oréal",  
-            "Renault", 
-            "Ubisoft", 
-            "Orange", 
-            "Carrefour",
-            "TF1", 
-            "EDF", 
-            "OVH Groupe")
+load(paste0(backup, "symbols.RData"))
+tickers <- symbols %>% pull(tickers) 
+names(tickers) <- rownames(symbols)
 
-selection <- french_stocks %>%
-  filter(Name %in% assets) %>%
-  select(c(Name, Symbol))
+# yahoo finance data
+date_init <- "2021-01-01"
+yf_data <- get_tq_data(tickers = tickers, 
+                       start_date = date_init) 
 
-tickers <- selection %>%
-  pull(Symbol)
-names(tickers) <- selection %>%
-  pull(Name) 
+save_data_list(df_list = yf_data)
 
+# Predicition with virtual environment --------------------------------------------------------------------
+
+use_virtualenv("stockPrediction_virtualenv", 
+               required = T)
+
+setwd("./ML/")
+source_python(file = "price_prediction.py") 
+setwd(dir)
 
 # User Interface ----------------------------------------------------------
 
@@ -69,7 +70,7 @@ ui <- fluidPage(
                                            asset2 = "OVH Groupe", 
                                            val2 = 5), 
                           br(), 
-                          dateInput(inputId = "first_buy_date",
+                          dateInput(inputId = "start_date",
                                     label = h4("Enter your start date"),
                                     width = "200px",  
                                     value = "2021-09-01",
@@ -100,7 +101,7 @@ ui <- fluidPage(
                             tabPanel("Composition",
                                      br(), 
                                      h4(paste( "Contribution of each asset to the portfolio value as of",
-                                              format(Sys.Date(), "%B %d, %Y") ), 
+                                              format(Sys.Date(), "%d/%m/%Y") ), 
                                         align = "center"),
                                      div(plotlyOutput("portfolio_composition", 
                                                       height = 400, 
@@ -198,16 +199,9 @@ server <- function(input, output) {
       input$num_shares_UBSFF,
       input$num_shares_OVH.PA,
       input$num_shares_TFI.PA, 
-      input$first_buy_date, 
+      input$start_date, 
       input$ticker), 
     {
-      
-      
-      ## yahoo finance data ----------
-      assets_data <- get_tq_data(tickers = tickers, 
-                                 start_date = input$first_buy_date) 
-      
-      
       
       ## portfolio ----------
       
@@ -225,9 +219,18 @@ server <- function(input, output) {
       
       names(num_shares) <- tickers
       
+      if (input$start_date >= date_init){
+        assets_data <- yf_data
+      } 
+      else{
+        assets_data <- get_tq_data(tickers =  tickers, 
+                                   start_date  = input$start_date)
+      }
+      
       ## value -----
       assets_value <- compute_assets_value(data = assets_data, 
-                                           num_shares = num_shares)
+                                           num_shares = num_shares) %>%
+        filter(date >= input$start_date) 
       port_value <- get_portfolio_value(assets_value)
       
       output$port_current_val <- renderInfoBox({
@@ -275,6 +278,7 @@ server <- function(input, output) {
       ### data viz -----
       output$portfolio_composition <- renderPlotly({
         assets_value %>%
+          filter(date >= input$start_date) %>%
           portfolio_composition()
       })
       
@@ -292,6 +296,7 @@ server <- function(input, output) {
       
       ## financial indicators ----------
       prices <- assets_data[[input$ticker]] %>%
+        filter(date >= input$start_date) %>%
         add_moving_avg(window = 20) %>%
         add_moving_avg(window = 50) %>%
         add_moving_avg(window = 100) %>%

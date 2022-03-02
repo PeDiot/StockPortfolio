@@ -1,7 +1,12 @@
 options(warn = -1)
 
-# ----- French companies data -----
+# ----- Directories -----
 backup <- "./backup/"
+ml <- "./ML/"
+tmp <- "./ML/tmp/"
+
+# ----- French companies data -----
+
 french_stocks <- read_csv(file = paste0(backup, "FrenchStocks.csv"), 
                  show_col_types = FALSE)
 
@@ -32,6 +37,25 @@ periods <- c("2w" = 1,
              "24m" = 24)
 
 # ----- Utils -----
+
+save_data_list <- function(df_list){
+  "Save list of dataframes."
+  
+  names <- names(df_list)
+  n_dfs <- length(df_list)
+  sapply(seq_along(1:n_dfs), 
+         function(i) write_feather(df_list[[i]], 
+                                   paste0(tmp, names[i],".feather")))
+}
+
+save_num_shares <- function(num_shares){
+  "Save number of shares to RData."
+  
+  dat <- data.frame(num_shares) 
+  save(dat, 
+       file = paste0(tmp, "num_shares.RData"))
+  
+}
 
 get_asset <- function(ticker){
   "Return ticker for a given asset."
@@ -290,6 +314,15 @@ add_moving_avg <- function(
     as.data.table() %>%
     setnames(old = "MA", new = new_name) %>%
     as.data.frame()
+  
+}
+
+get_last_ma <- function(price_data, ma){
+  "Return last moving average."
+  
+  price_data %>%
+    filter(date == max(date)) %>%
+    pull(ma)
   
 }
 
@@ -666,7 +699,7 @@ candlestick_chart <- function(ticker, price_data){
               y = ~MA20,
               name = "MA20",
               line = list(color = short, 
-                          width = 1),
+                          width = 1.5),
               hoverinfo = "none") %>%
     add_trace(type = "scatter", 
               mode = "lines",
@@ -675,7 +708,7 @@ candlestick_chart <- function(ticker, price_data){
               y = ~MA50,
               name = "MA50",
               line = list(color = medium,
-                          width = 1), 
+                          width = 1.5), 
               hoverinfo = "none") %>%
     add_trace(type = "scatter", 
               mode = "lines",
@@ -685,7 +718,7 @@ candlestick_chart <- function(ticker, price_data){
               name = "MA100",
               line = list(color = long, 
                           dash = "dot", 
-                          width = 1), 
+                          width = 1.5), 
               hoverinfo = "none")
   
   title <- get_indicator_plot_title(ticker, 
@@ -897,6 +930,36 @@ infoBox_asset_cumret <- function(asset, type = "best"){
           color = color, 
           fill = F)
   
+}
+
+infoBox_MA <- function(ma_val, ma_type){
+  "Return infoBox to display last moving average."
+  
+  if (is.na(ma_val)){
+    ma_val <- NA
+  }
+  else{
+    ma_val <- paste0(round(ma_val, 2), "$")
+  }
+  if (ma_type == "MA20"){
+    color <- "aqua"
+    title <- paste(ma_type, "(short)")
+  }
+  if (ma_type == "MA50"){
+    color <- "purple"
+    title <- paste(ma_type, "(medium)")
+  }
+  if (ma_type == "MA100"){
+    color = "black"
+    title <- paste(ma_type, "(long)")
+  }
+  
+  infoBox(title = title, 
+          value = ma_val,  
+          icon =  tags$i(class = "fas fa-chart-line", 
+                         style="font-size: 20px"), 
+          color = color, 
+          fill = F)
 }
 
 num_shares_input <- function(
