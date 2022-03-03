@@ -1,6 +1,6 @@
 # Setup -------------------------------------------------------------------
-dir <- "C:/Users/pemma/OneDrive - Université de Tours/Mécen/M2/S2/02 - Big Data/Project/StockPortfolio"
-setwd(dir) 
+# dir <- "C:/Users/pemma/OneDrive - Université de Tours/Mécen/M2/S2/02 - Big Data/Project/StockPortfolio"
+# setwd(dir) 
 
 source("Rpackages.R")
 source("setup.R",
@@ -21,7 +21,7 @@ save_data_list(df_list = yf_data)
 
 # Predicition with virtual environment --------------------------------------------------------------------
 
-use_virtualenv("stockPrediction_virtualenv", 
+use_virtualenv("./ML/stockPrediction_virtualenv", 
                required = T)
 
 setwd("./ML/")
