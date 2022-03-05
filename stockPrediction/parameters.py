@@ -1,4 +1,5 @@
 def params(data):
+    """Initialize parameters (for window_size 10 values are taken to predict the 11th)."""
     
     data.index = data["date"]
     data = data.loc[:, "close"]
@@ -6,7 +7,7 @@ def params(data):
     split_time = round(len(data)*0.8)
     data_ = [i for i in data]
 
-    window_size = 10            # 10 values are taken to predict the 11th
+    window_size = 10            
     batch_size = 8
     return data_, time, split_time, window_size, batch_size, data
 

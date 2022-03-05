@@ -8,12 +8,8 @@ from pyreadr import read_r, write_rdata
 from os import listdir
 from typing import List, Dict
 
-backup = "C:/Users/pemma/OneDrive - Université de Tours/Mécen/M2/S2/02 - Big Data/Project/StockPortfolio/backup/"
-tmp = "./tmp/" 
-
-def get_tickers() -> List:
+def get_tickers(file_path: str) -> List:
     """Return a list of tickers to handle."""
-    file_path = backup + "symbols.Rdata"
     d = read_r(file_path)
     tickers = d["symbols"].values.tolist() 
     return [ticker[0] for ticker in tickers] 
@@ -24,9 +20,8 @@ def init_prediction_dict(tickers: List) -> Dict:
     d["date"] = [date.today() + timedelta(d) for d in range(0, 6)]
     return d 
 
-def load_assets_data() -> List: 
+def load_assets_data(dir: str) -> List: 
     """return a list of price dataframes."""
-    dir = tmp + "assets/"
     files = listdir(dir) 
     return [
         pd.read_feather(dir+file) 

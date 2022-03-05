@@ -1,7 +1,8 @@
 from typing import Tuple
 from pandas.core.frame import DataFrame
 import tensorflow as tf
-from parameters import params
+
+from .parameters import params
 
 def transform_train_test(data: DataFrame) -> Tuple:
     

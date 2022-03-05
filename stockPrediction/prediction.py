@@ -1,12 +1,6 @@
-from train_test import transform_train_test
-from parameters import params
-from utils import (
-    tmp, 
-    get_tickers, 
-    init_prediction_dict,
-    load_assets_data,
-    save_to_rdata, 
-) 
+from .train_test import transform_train_test
+from .parameters import params
+from .utils import init_prediction_dict 
 
 import pandas as pd
 from pandas.core.frame import DataFrame
@@ -17,14 +11,13 @@ from typing import (
 )
 
 import tensorflow as tf
+from keras.engine.sequential import Sequential
 
-TICKERS = get_tickers()
-
-def _predict_keras(data: DataFrame) -> Tuple:
+def _predict_keras(
+    model: Sequential,
+    data: DataFrame
+) -> Tuple:
     "5-day stock prediction for on asset using keras neural network."
-    
-    model = tf.keras.models.load_model("model.h5")
-    
     test_df = transform_train_test(data)[0]
     window_size = params(data)[3]
     test = transform_train_test(data)[4]
@@ -51,20 +44,20 @@ def _predict_keras(data: DataFrame) -> Tuple:
         
     return test[-5:], last_val
 
-def predict_assets(assets_data: List[DataFrame]) -> Tuple: 
+def _load_model(dir: str) -> Sequential: 
+    """Load keras model."""
+    return tf.keras.models.load_model(dir)
+
+def predict_assets(
+    assets_data: List[DataFrame], 
+    tickers: List, 
+    model_dir: str
+) -> Tuple: 
     """Output 5-day price prediction and last observed value for a list of assets."""
-    predictions = init_prediction_dict(tickers=TICKERS)
+    predictions = init_prediction_dict(tickers)
+    model = _load_model(dir=model_dir)
     for dat in assets_data: 
         ticker = dat.loc[0, "ticker"]
-        preds, last_val = _predict_keras(dat) 
+        preds, last_val = _predict_keras(model=model, data=dat) 
         predictions[ticker] = [last_val] + preds
     return pd.DataFrame(predictions)
-
-assets = load_assets_data() 
-predictions = predict_assets(assets) 
-save_to_rdata(
-    pydat=predictions,
-    file_path=tmp+"stock_predictions.RData"
-)
-
-
