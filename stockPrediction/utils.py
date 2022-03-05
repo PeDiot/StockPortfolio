@@ -17,7 +17,7 @@ def get_tickers(file_path: str) -> List:
 def init_prediction_dict(tickers: List) -> Dict: 
     """Initialize a dictionnary to fill with predicted data."""
     d = dict()
-    d["date"] = [date.today() + timedelta(d) for d in range(0, 6)]
+    d["date"] = [date.today() + timedelta(d) for d in range(1, 6)]
     return d 
 
 def load_assets_data(dir: str) -> List: 
