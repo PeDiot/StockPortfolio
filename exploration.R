@@ -1,5 +1,3 @@
-# --------- French Stock - Data Exploration --------
-
 # ----- Setup -----
 
 source("Rpackages.R")
@@ -47,12 +45,12 @@ system.time(
                            start_date = "2021-09-01")
 )
 
-# ----- Value per asset ------
-
 assets_value <- compute_assets_value(data = assets_data, 
                                      num_shares = num_shares)
 
-portfolio_data <- get_portfolio_value(assets_value) 
+# ----- Portfolio value ------
+
+portfolio_data <- get_portfolio_value(bind_rows(assets_value))  
 
 ret_data <- assets_value %>%
   compute_daily_returns() %>%
@@ -156,29 +154,30 @@ p <- prices  %>%
 p
 
 
-# ----- Virtual Environment -----
+# ----- Stock prediction -----
 
-use_virtualenv("./ML/stockPrediction_virtualenv", 
-               required = F)
-source_python(file = "./ML/train_test.py")
-source_python(file = "./ML/utils.py")
-source_python(file = "./ML/parameters.py")
-source_python(file = "./ML/price_prediction.py") 
+## ----- Make predictions -----
 
+reticulate::py_run_file("stock_prediction.py")
 
-reticulate::py_run_file("./stockPrediction/__main___.py")
+## ----- Predictions data viz -----
 
-# ----- Predictions -----
-
-pred_path <- "./ML/tmp/stock_predictions.RData"
+pred_path <- "./backup/stock_predictions.RData"
 load(file = pred_path)
 
-predictions <- predictions %>%
-  pivot_longer(cols = -date, 
-               names_to = "ticker", 
-               values_to = "close") %>%
-  relocate(ticker, .before = date) %>%
-  ungroup() %>%
-  group_by(ticker)
+predictions <- get_predicted_data(predictions, 
+                                  tickers,
+                                  num_shares) 
 
-assets_value
+assets_value <- compute_assets_value(data = assets_data, 
+                                     num_shares = num_shares, 
+                                     merge = F)
+
+final_assets_data <- add_predictions(observed_dat = assets_value, 
+                                     predicted_dat = predictions, 
+                                     ticker = tickers) 
+
+portfolio_value_pred <- get_portfolio_value(assets_value = final_assets_data)
+
+
+
