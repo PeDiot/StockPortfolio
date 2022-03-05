@@ -15,4 +15,3 @@ library(tidyquant)
 library(TTR)
 
 library(feather)
-library(reticulate)
