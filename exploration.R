@@ -166,7 +166,7 @@ source_python(file = "./ML/parameters.py")
 source_python(file = "./ML/price_prediction.py") 
 
 
-reticulate::py_run_file("./ML/lib/price_prediction.py")
+reticulate::py_run_file("./stockPrediction/__main___.py")
 
 # ----- Predictions -----
 
