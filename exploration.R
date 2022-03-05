@@ -154,3 +154,31 @@ p <- prices  %>%
             legend_group = "two",  
             yaxis = "y2")
 p
+
+
+# ----- Virtual Environment -----
+
+use_virtualenv("./ML/stockPrediction_virtualenv", 
+               required = F)
+source_python(file = "./ML/train_test.py")
+source_python(file = "./ML/utils.py")
+source_python(file = "./ML/parameters.py")
+source_python(file = "./ML/price_prediction.py") 
+
+
+reticulate::py_run_file("./ML/lib/price_prediction.py")
+
+# ----- Predictions -----
+
+pred_path <- "./ML/tmp/stock_predictions.RData"
+load(file = pred_path)
+
+predictions <- predictions %>%
+  pivot_longer(cols = -date, 
+               names_to = "ticker", 
+               values_to = "close") %>%
+  relocate(ticker, .before = date) %>%
+  ungroup() %>%
+  group_by(ticker)
+
+assets_value
