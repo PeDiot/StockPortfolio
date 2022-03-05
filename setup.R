@@ -2,13 +2,12 @@ options(warn = -1)
 
 # ----- Directories -----
 backup <- "./backup/"
-ml <- "./ML/"
-tmp <- "./ML/tmp/"
+pred_path <- paste0(backup, "stock_predictions.RData") 
 
 # ----- French companies data -----
 
 french_stocks <- read_csv(file = paste0(backup, "FrenchStocks.csv"), 
-                 show_col_types = FALSE)
+                          show_col_types = FALSE)
 
 # ----- Colors -----
 
@@ -45,7 +44,7 @@ save_data_list <- function(df_list){
   n_dfs <- length(df_list)
   sapply(seq_along(1:n_dfs), 
          function(i) write_feather(df_list[[i]], 
-                                   paste0(tmp, names[i],".feather")))
+                                   paste0(backup, "assets/", names[i],".feather")))
 }
 
 save_num_shares <- function(num_shares){
@@ -53,7 +52,7 @@ save_num_shares <- function(num_shares){
   
   dat <- data.frame(num_shares) 
   save(dat, 
-       file = paste0(tmp, "num_shares.RData"))
+       file = paste0(backup, "num_shares.RData"))
   
 }
 
@@ -157,7 +156,7 @@ cumret_to_percent <- function(cr){
 compute_assets_value <- function(data, num_shares){
   "Return assets' value given prices and number of shares."
   
-  lapply(
+  res <- lapply(
     data, 
     function(df){
       ticker <- df %>%
@@ -169,8 +168,9 @@ compute_assets_value <- function(data, num_shares){
         mutate(n_shares = rep(n_shares, n)) %>%
         mutate(value = close * n_shares) 
     }
-  ) %>%
-    bind_rows()
+  ) 
+  
+  return(res) 
   
 }
 
@@ -292,6 +292,67 @@ get_worst_asset <- function(assets_cumret){
   l <- list(asset = get_asset(d$ticker), 
             pct_cr = cumret_to_percent(d$cr))
   return(l) 
+  
+}
+
+# ----- Predictions -----
+
+get_predicted_data <- function(
+  predictions,
+  tickers, 
+  num_shares
+){
+  "Return a list of predicted data frames."
+  
+  d <- predictions %>%
+    pivot_longer(cols = -date, 
+                 values_to = "close", 
+                 names_to = "ticker") %>%
+    data.frame() %>%
+    mutate(close = as.numeric(close)) 
+  
+  res <- lapply(tickers, 
+                function(ticker){
+                  tmp <- d[d$ticker == ticker, ]
+                  rownames(tmp) <- 1:5 
+                  n_shares <- rep(num_shares[ticker], 5) 
+                  tmp %>%
+                    mutate(n_shares = n_shares) %>%
+                    mutate(value = n_shares * close) %>%
+                    relocate(ticker, .before = date)
+                }) 
+  names(res) <- tickers
+  return(res) 
+  
+}
+
+add_predictions <- function(
+  observed_dat,
+  predicted_dat, 
+  tickers, 
+  merge = T
+){
+  "Add predictions to observed price data."
+  
+  res <- lapply(tickers, 
+                function(ticker){
+                  obs <- observed_dat[[ticker]] %>%
+                    select(c(ticker, 
+                             date, 
+                             close, 
+                             n_shares, 
+                             value))
+                  preds <- predicted_dat[[ticker]]
+                  rbind(obs, preds)
+                })
+  names(res) <- tickers
+  
+  if (merge == T){
+    res <- res %>%
+      bind_rows()
+  }
+  
+  return(res)
   
 }
 
@@ -453,29 +514,32 @@ get_rsi_signals <- function(
 
 # --- Plotly settings
 
-range_selector_period <- function(x_pos = .5, y_pos){
+range_selector_period <- function(
+  x_pos = .5, 
+  y_pos
+){
   "Plotly buttons to select period."
   
-  list(visible = TRUE, x = x_pos, y = y_pos,
-       xanchor = "center", yref = "paper",
-       font = list(size = 9),
-       buttons = list(
-         list(count=1,
-              label="ALL",
-              step="all"),
-         list(count=6,
-              label="6 MO",
-              step="month",
-              stepmode="backward"),
-         list(count=3,
-              label="3 MO",
-              step="month",
-              stepmode="backward"),
-         list(count=1,
-              label="1 MO",
-              step="month",
-              stepmode="backward")
-       ))
+ list(visible = TRUE, x = x_pos, y = y_pos,
+               xanchor = "center", yref = "paper",
+               font = list(size = 9),
+               buttons = list(
+                 list(count=1,
+                      label="ALL",
+                      step="all"),
+                 list(count=6,
+                      label="6 MO",
+                      step="month",
+                      stepmode="backward"),
+                 list(count=3,
+                      label="3 MO",
+                      step="month",
+                      stepmode="backward"),
+                 list(count=1,
+                      label="1 MO",
+                      step="month",
+                      stepmode="backward")
+               ))
   
 }
 
@@ -487,16 +551,34 @@ plotly_legend <- function(x.pos = .5, y.pos = -.2, size = 12){
        borderwidth = .2)
 }
 
-plotly_layout <- function(p, title, title.y){
+plotly_layout <- function(
+  p,
+  title,
+  title.y, 
+  range_selector = T
+){
   
-  p %>%
-    layout(title = title,
-           xaxis = list(rangeslider = list(visible = F), 
-                        rangeselector = range_selector_period(y_pos = -0.15), 
-                        title = ""),
-           yaxis = list(fixedrange = FALSE, 
-                        title = title.y),
-           legend = plotly_legend()) 
+  if (range_selector == T){
+    p_layout <-p %>%
+      layout(title = title,
+             xaxis = list(rangeslider = list(visible = F), 
+                          rangeselector = range_selector_period(y_pos = -0.15),
+                          title = ""),
+             yaxis = list(fixedrange = FALSE, 
+                          title = title.y),
+             legend = plotly_legend()) 
+  }
+  else {
+    p_layout <- p %>%
+      layout(title = title,
+             xaxis = list(rangeslider = list(visible = F), 
+                          title = ""),
+             yaxis = list(fixedrange = FALSE, 
+                          title = title.y),
+             legend = plotly_legend(y.pos = -.15)) 
+  }
+  return(p_layout)
+    
 }
 
 
@@ -862,6 +944,40 @@ rsi_chart <- function(ticker, price_data){
            legend = plotly_legend())
   
   return(p)
+  
+}
+
+plot_portfolio_predictions <- function(portfolio_value_pred, start_date){
+  "Return a chart with observed and predicted values over last months."
+  
+  portfolio_value_pred %>%
+    filter(date >= start_date) %>%
+    mutate(pred_value = ifelse(date >= today(), 
+                               value, 
+                               NA), 
+           value = ifelse(date >= today(), 
+                          NA, 
+                          value)) %>% 
+    plot_ly() %>%
+    add_trace(type = "scatter", 
+              mode = "lines",
+              marker = NULL,
+              x = ~date,
+              y = ~value,
+              name = "Observed",
+              line = list(width = 1.2, 
+                          color = evolution)) %>%
+    add_trace(type = "scatter", 
+              mode = "lines",
+              marker = NULL,
+              x = ~date,
+              y = ~pred_value,
+              name = "Predicted",
+              line = list(width = 1.7, 
+                          color = medium)) %>%
+    plotly_layout(title = "5-day Portfolio Value Prediction", 
+                  title.y = "Value ($)", 
+                  range_selector = F) 
   
 }
 

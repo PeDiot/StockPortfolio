@@ -1,8 +1,5 @@
 # Setup -------------------------------------------------------------------
 
-dir <- "C:/Users/pemma/OneDrive - Université de Tours/Mécen/M2/S2/02 - Big Data/Project/StockPortfolio"
-setwd(dir) 
-
 source("Rpackages.R")
 source("setup.R",
        encoding = "UTF-8")
@@ -20,14 +17,9 @@ yf_data <- get_tq_data(tickers = tickers,
 
 save_data_list(df_list = yf_data)
 
-# Predicition with virtual environment --------------------------------------------------------------------
+# Predicition using python script --------------------------------------------------------------------
 
-use_virtualenv("./ML/stockPrediction_virtualenv", 
-               required = F)
-
-setwd("./ML/")
-source_python(file = "price_prediction.py") 
-setwd(dir)
+reticulate::py_run_file("stock_prediction.py")
 
 # User Interface ----------------------------------------------------------
 
@@ -179,7 +171,34 @@ ui <- fluidPage(
              ## stock prediction ----------
              tabPanel("Prediction", 
                       fluid = TRUE, 
-                      icon = icon("chart-line")) 
+                      icon = icon("chart-line"), 
+                      
+                      sidebarLayout(
+                        
+                        ### inputs -----
+                        sidebarPanel(
+                          width = 3, 
+                          dateInput(inputId = "pred_start_date",
+                                    label = h4("How far back do you want to go?"),
+                                    width = "200px",  
+                                    value = "2022-01-01",
+                                    min = today() - months(3), 
+                                    max = today(),
+                                    format = "yyyy-mm-dd")
+                        ), 
+                        
+                        ### predictions data viz -----
+                        mainPanel(
+                          br(), 
+                          br(), 
+                          br(), 
+                          div(plotlyOutput("portfolio_pred_plot", 
+                                           height = 400, 
+                                           width = 700), 
+                              align = "center")
+                        )
+                      )
+              ) 
              
   )
   
@@ -201,7 +220,8 @@ server <- function(input, output) {
       input$num_shares_OVH.PA,
       input$num_shares_TFI.PA, 
       input$start_date, 
-      input$ticker), 
+      input$ticker, 
+      input$pred_start_date), 
     {
       
       ## portfolio ----------
@@ -229,8 +249,10 @@ server <- function(input, output) {
       }
       
       ## value -----
-      assets_value <- compute_assets_value(data = assets_data, 
-                                           num_shares = num_shares) %>%
+      assets_value_list <- compute_assets_value(data = assets_data, 
+                                           num_shares = num_shares) 
+      assets_value <- assets_value_list %>%
+        bind_rows() %>%
         filter(date >= input$start_date) 
       port_value <- get_portfolio_value(assets_value)
       
@@ -268,7 +290,9 @@ server <- function(input, output) {
       
       ### current date -----
       output$current_date <- renderText({
-        current_date <- max(assets_value$date)
+        current_date <- assets_value %>%
+          pull(date) %>%
+          max() 
         format(current_date, "%B %d, %Y")
       })
       
@@ -320,6 +344,26 @@ server <- function(input, output) {
       output$rsi_plot <- renderPlotly({
         prices %>%
           rsi_chart(ticker = input$ticker) 
+      })
+      
+      
+      ## predictions ----------
+      
+      ### format data -----
+      load(file = pred_path)
+      predictions <- get_predicted_data(predictions, 
+                                        tickers,
+                                        num_shares)
+      final_assets_value <- add_predictions(observed_dat = assets_value_list, 
+                                           predicted_dat = predictions, 
+                                           ticker = tickers)
+      
+      ### portfolio predicted value ----
+      portfolio_value_pred <- get_portfolio_value(assets_value = final_assets_value)
+      
+      output$portfolio_pred_plot <- renderPlotly({
+        plot_portfolio_predictions(portfolio_value_pred, 
+                                   start_date = input$pred_start_date) 
       })
       
     }
