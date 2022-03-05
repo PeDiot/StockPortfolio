@@ -1,8 +1,7 @@
 # Setup -------------------------------------------------------------------
 
 source("Rpackages.R")
-source("setup.R",
-       encoding = "UTF-8")
+source("setup.R", encoding = "UTF-8")
 
 # Data --------------------------------------------------------------------
 
@@ -17,7 +16,13 @@ yf_data <- get_tq_data(tickers = tickers,
 
 save_data_list(df_list = yf_data)
 
-# Predicition using python script --------------------------------------------------------------------
+# Backup predicted value --------------------------------------------------------------------
+
+## Virtual environment -----
+
+# source("virtualenv.R", encoding = "UTF-8")
+
+## Launch Python script -----
 
 reticulate::py_run_file("stock_prediction.py")
 
