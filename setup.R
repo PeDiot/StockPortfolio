@@ -43,7 +43,8 @@ save_data_list <- function(df_list){
   names <- names(df_list)
   n_dfs <- length(df_list)
   sapply(seq_along(1:n_dfs), 
-         function(i) write_feather(df_list[[i]], 
+         function(i) write_feather(df_list[[i]] %>%
+                                     filter(date >= today() - months(12)), 
                                    paste0(backup, "assets/", names[i],".feather")))
 }
 
@@ -56,22 +57,19 @@ save_num_shares <- function(num_shares){
   
 }
 
-get_asset <- function(ticker){
-  "Return ticker for a given asset."
+get_ticker <- function(company_name){
+  "Return ticker given company_name."
   
-  french_stocks %>%
-    filter(Symbol == ticker) %>%
-    pull(Name)
+  symbols[company_name, "tickers"]
 }
 
-get_ticker <- function(asset){
-  "Return asset for a given ticker."
+get_company_name <- function(ticker){
+  "Return company name given ticker."
   
-  french_stocks %>%
-    filter(Name == asset) %>%
-    pull(Symbol) 
+  symbols %>%
+    filter(tickers == ticker) %>%
+    rownames()
 }
-
 get_asset_last_value <- function(ticker, assets_value){
   "Return ticker's last value given its price and number of shares."
   assets_value[assets_value$ticker == ticker,]$value %>% 
@@ -81,7 +79,7 @@ get_asset_last_value <- function(ticker, assets_value){
 
 get_indicator_plot_title <- function(ticker, indicator_type){
   "Make title ."
-  asset <- get_asset(ticker)
+  asset <- get_company_name(ticker)
   title <- paste0(asset, 
                  " (", 
                  ticker,
@@ -125,7 +123,7 @@ clean_assets_value <- function(assets_value, portfolio_value){
       last_val <- get_asset_last_value(ticker, 
                                         assets_value) 
       contrib <- 100 * last_val / portfolio_value
-      asset <- get_asset(ticker)
+      asset <- get_company_name(ticker)
       paste0(asset, " (", round(contrib, 1), "%)")
     }
   ) %>% unlist()
@@ -141,11 +139,11 @@ cumret_to_percent <- function(cr){
   
   if (cr >= 1){
     pct_cr <- 100*(cr - 1) %>%
-      round(2)
+      round(3)
   }
   else{
     pct_cr <- - 100*(1 - cr) %>%
-      round(2)
+      round(3)
   }
   return(pct_cr)
   
@@ -186,10 +184,10 @@ get_portfolio_value <- function(assets_value){
   
 }
 
-get_portfolio_current_value <- function(portfolio_value){
+get_current_value <- function(data){
   "Return portfolio value at last date." 
   
-  portfolio_value %>%
+  data %>%
     filter(date == max(date)) %>%
     pull(value) %>%
     round(2) %>%
@@ -204,15 +202,31 @@ get_portfolio_current_value <- function(portfolio_value){
 compute_daily_returns <- function(assets_value){
   "Calculate the daily returns and for our assets."
   
-  assets_value %>%
-    group_by(ticker) %>%
-    complete(date = seq.Date(min(date), max(date), by="day")) %>%
-    fill(value) %>%
-    group_by(ticker) %>%
-    tq_transmute(select = close,
-                 mutate_fun = periodReturn,
-                 period = "daily",
-                 col_rename = "ret") 
+  if (assets_value %>%
+      pull(ticker) %>%
+      unique() %>%
+      length() == 1){
+    returns <- assets_value %>%
+      complete(date = seq.Date(min(date), max(date), by="day")) %>%
+      fill(close) %>%
+      tq_transmute(select = close,
+                   mutate_fun = periodReturn,
+                   period = "daily",
+                   col_rename = "ret") 
+  }
+  else{
+    returns <- assets_value %>%
+      group_by(ticker) %>%
+      complete(date = seq.Date(min(date), max(date), by="day")) %>%
+      fill(value) %>%
+      group_by(ticker) %>%
+      tq_transmute(select = close,
+                   mutate_fun = periodReturn,
+                   period = "daily",
+                   col_rename = "ret") 
+  }
+  
+  return(returns)
   
 }
 
@@ -221,7 +235,7 @@ compute_weighted_returns <- function(ret_data, num_shares){
   
   n_shares <- sum(num_shares)
   wts_dat <- data.frame(ticker = names(num_shares), 
-                           num_shares = num_shares) %>%
+                        num_shares = num_shares) %>%
     mutate(wts = num_shares / n_shares)
   
   ret_data <- left_join(x = ret_data,
@@ -276,7 +290,7 @@ get_best_asset <- function(assets_cumret){
     filter(date == max(date)) %>% 
     ungroup() %>% 
     filter(cr == max(cr))
-  l <- list(asset = get_asset(d$ticker), 
+  l <- list(asset = get_company_name(d$ticker), 
             pct_cr = cumret_to_percent(d$cr))
   return(l) 
   
@@ -289,7 +303,7 @@ get_worst_asset <- function(assets_cumret){
     filter(date == max(date)) %>% 
     ungroup() %>% 
     filter(cr == min(cr))
-  l <- list(asset = get_asset(d$ticker), 
+  l <- list(asset = get_company_name(d$ticker), 
             pct_cr = cumret_to_percent(d$cr))
   return(l) 
   
@@ -718,7 +732,7 @@ portfolio_composition <- function(assets_value){
   d <- assets_value %>%
     filter(date == max(date)) %>%
     mutate(ticker = as.factor(ticker)) %>%
-    mutate(asset = lapply(ticker, get_asset))
+    mutate(asset = lapply(ticker, get_company_name))
   tot_val <- sum(d$value)
   d <- d %>%
     mutate(pct = 100 * value / tot_val)
@@ -999,6 +1013,25 @@ infoBox_dims <- function(
                  ";} .info-box-content {padding-top: 0px; padding-bottom: 0px;}")
   return(dims)
 } 
+
+
+infoBox_last_price <- function(last_val, type = "price"){
+  "Return infoBox for last price or value."
+  
+  if (type == "price"){
+    title <- "Current price"
+  }
+  if (type == "value"){
+    title <- "Current value"
+  }
+  infoBox(title = title,
+          value = last_val,
+          color = "light-blue", 
+          icon = tags$i(class = "fas fa-dollar-sign", 
+                        style = "font-size: 20px"), 
+          fill = F)
+}
+
 
 infoBox_port_cumret <- function(last_cr){
   "Return infoBox for current cumulative returns."

@@ -42,17 +42,22 @@ names(num_shares) <- selection %>%
 
 system.time(
   assets_data <- get_tq_data(tickers = tickers, 
-                           start_date = "2021-09-01")
+                           start_date = "2010-01-01")
 )
 
 assets_value <- compute_assets_value(data = assets_data, 
                                      num_shares = num_shares)
+
+assets_value %>%
+  bind_rows() %>%
+  filter(date >= "2021-09-01")
 
 # ----- Portfolio value ------
 
 portfolio_data <- get_portfolio_value(bind_rows(assets_value))  
 
 ret_data <- assets_value %>%
+  bind_rows() %>%
   compute_daily_returns() %>%
   compute_weighted_returns(num_shares = num_shares) 
 

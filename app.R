@@ -10,13 +10,13 @@ tickers <- symbols %>% pull(tickers)
 names(tickers) <- rownames(symbols)
 
 # yahoo finance data
-date_init <- "2021-01-01"
+date_init <- today() - years(5)
 yf_data <- get_tq_data(tickers = tickers, 
                        start_date = date_init) 
 
 save_data_list(df_list = yf_data)
 
-# Backup predicted value --------------------------------------------------------------------
+# Backup predicted values --------------------------------------------------------------------
 
 ## Virtual environment -----
 
@@ -24,7 +24,7 @@ save_data_list(df_list = yf_data)
 
 ## Launch Python script -----
 
-reticulate::py_run_file("stock_prediction.py")
+# reticulate::py_run_file("stock_prediction.py")
 
 # User Interface ----------------------------------------------------------
 
@@ -71,8 +71,9 @@ ui <- fluidPage(
                           dateInput(inputId = "start_date",
                                     label = h4("Enter your start date"),
                                     width = "200px",  
-                                    value = "2021-09-01",
-                                    max = Sys.Date(),
+                                    value = today() - months(6),
+                                    min = date_init, 
+                                    max = today(),
                                     format = "yyyy-mm-dd")
                           
                         ), 
@@ -86,9 +87,9 @@ ui <- fluidPage(
                                      br(), 
                                      br(),
                                      fluidRow(column(width = 2), 
-                                              infoBoxOutput("port_current_val"),
+                                              infoBoxOutput("port_last_val"),
                                               column(width = 1), 
-                                              infoBoxOutput("port_current_cumret")), 
+                                              infoBoxOutput("port_last_cumret")), 
                                      br(), 
                                      div(plotlyOutput("portfolio_evolution", 
                                                       height = 600, 
@@ -134,7 +135,19 @@ ui <- fluidPage(
                           selectInput("ticker", 
                                       label = h4("Which asset?"), 
                                       choices = tickers, 
-                                      selected = "LVMH")
+                                      selected = "LVMH"),
+                          br(), 
+                          br(), 
+                          br(), 
+                          br(), 
+                          br(), 
+                          dateInput(inputId = "buy_date",
+                                    label = h4("When did you buy the stock?"),
+                                    width = "200px",  
+                                    value = today() - months(6),
+                                    min = date_init, 
+                                    max = today(),
+                                    format = "yyyy-mm-dd")
                           
                         ),
                         
@@ -148,7 +161,13 @@ ui <- fluidPage(
                                      div(plotlyOutput("candlestick_plot", 
                                                   height = 400, 
                                                   width = 700), 
-                                         align = "center")),
+                                         align = "center"), 
+                                     br(), 
+                                     br(),
+                                     fluidRow(column(width = 2), 
+                                              infoBoxOutput("asset_last_price"),
+                                              column(width = 1), 
+                                              infoBoxOutput("asset_last_cumret"))),
                             
                             tabPanel("MACD",
                                      br(), 
@@ -186,7 +205,7 @@ ui <- fluidPage(
                           dateInput(inputId = "pred_start_date",
                                     label = h4("How far back do you want to go?"),
                                     width = "200px",  
-                                    value = "2022-01-01",
+                                    value = today() - months(1),
                                     min = today() - months(3), 
                                     max = today(),
                                     format = "yyyy-mm-dd")
@@ -225,7 +244,8 @@ server <- function(input, output) {
       input$num_shares_OVH.PA,
       input$num_shares_TFI.PA, 
       input$start_date, 
-      input$ticker, 
+      input$ticker,
+      input$buy_date, 
       input$pred_start_date), 
     {
       
@@ -244,31 +264,19 @@ server <- function(input, output) {
                       input$num_shares_TFI.PA)
       
       names(num_shares) <- tickers
-      
-      if (input$start_date >= date_init){
-        assets_data <- yf_data
-      } 
-      else{
-        assets_data <- get_tq_data(tickers =  tickers, 
-                                   start_date  = input$start_date)
-      }
+
+      assets_value_list <- compute_assets_value(data = yf_data, 
+                                                num_shares = num_shares) 
       
       ## value -----
-      assets_value_list <- compute_assets_value(data = assets_data, 
-                                           num_shares = num_shares) 
       assets_value <- assets_value_list %>%
         bind_rows() %>%
         filter(date >= input$start_date) 
       port_value <- get_portfolio_value(assets_value)
       
-      output$port_current_val <- renderInfoBox({
-        val <- get_portfolio_current_value(port_value) 
-        infoBox(title = "Current value",
-                value = val,
-                color = "light-blue", 
-                icon = tags$i(class = "fas fa-dollar-sign", 
-                              style = "font-size: 20px"), 
-                fill = F)
+      output$port_last_val <- renderInfoBox({
+        val <- get_current_value(data = port_value) 
+        infoBox_last_price(last_val = val, type = "value")
         
       })
       
@@ -286,20 +294,12 @@ server <- function(input, output) {
                             port_cumret)
       })
       
-      output$port_current_cumret <- renderInfoBox({
+      output$port_last_cumret <- renderInfoBox({
         last_cumret <- get_current_cumret(port_cumret)
         infoBox_port_cumret(last_cumret)
       })
       
       ## composition ----------
-      
-      ### current date -----
-      output$current_date <- renderText({
-        current_date <- assets_value %>%
-          pull(date) %>%
-          max() 
-        format(current_date, "%B %d, %Y")
-      })
       
       ### cumulative returns -----
       assets_cumret <- returns %>%
@@ -308,7 +308,6 @@ server <- function(input, output) {
       ### data viz -----
       output$portfolio_composition <- renderPlotly({
         assets_value %>%
-          filter(date >= input$start_date) %>%
           portfolio_composition()
       })
       
@@ -323,15 +322,31 @@ server <- function(input, output) {
       })
       
       
-      
       ## financial indicators ----------
-      prices <- assets_data[[input$ticker]] %>%
-        filter(date >= input$start_date) %>%
+      prices <- yf_data[[input$ticker]] %>%
+        filter(date >= input$buy_date) %>%
         add_moving_avg(window = 20) %>%
         add_moving_avg(window = 50) %>%
         add_moving_avg(window = 100) %>%
         add_macd() %>%
         add_rsi()
+      
+      ### asset's last price -----
+      output$asset_last_price <- renderInfoBox({
+        val <- get_current_value(data = prices %>%
+                                   rename(value = close))  
+        infoBox_last_price(last_val = val)
+        
+      })
+      
+      ### asset's last cumulative returns -----
+      asset_cumret <- assets_cumret %>%
+        filter(ticker == input$ticker)
+      
+      output$asset_last_cumret <- renderInfoBox({
+        last_cumret <- get_current_cumret(asset_cumret)
+        infoBox_port_cumret(last_cumret)
+      })
       
       ### candlestick with MAs -----
       output$candlestick_plot <- renderPlotly({
