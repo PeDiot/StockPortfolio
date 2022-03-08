@@ -4,11 +4,6 @@ options(warn = -1)
 backup <- "./backup/"
 pred_path <- paste0(backup, "stock_predictions.RData") 
 
-# ----- French companies data -----
-
-french_stocks <- read_csv(file = paste0(backup, "FrenchStocks.csv"), 
-                          show_col_types = FALSE)
-
 # ----- Colors -----
 
 evolution <- "#709ABE"
@@ -25,15 +20,11 @@ rsi <- "#F3B0DE"
 
 theme_set(theme_minimal())
 
-# ----- Dates -----
+# ----- Symbols -----
 
-periods <- c("2w" = 1, 
-             "1m" = 1, 
-             "3m" = 3, 
-             "6m" = 6, 
-             "9m" = 9, 
-             "12m" = 12, 
-             "24m" = 24)
+load(paste0(backup, "symbols.RData"))
+tickers <- symbols %>% pull(tickers) 
+names(tickers) <- rownames(symbols)
 
 # ----- Utils -----
 
@@ -189,6 +180,7 @@ get_current_value <- function(data){
   
   data %>%
     filter(date == max(date)) %>%
+    head(n = 1) %>%
     pull(value) %>%
     round(2) %>%
     format(big.mark = ",", 
@@ -661,6 +653,7 @@ plot_price_evolution <- function(
   plotly_obj, 
   title, 
   legend_group, 
+  trace_name = "Value ($)", 
   yaxis = NULL
 ){
   "Plot price evolution."
@@ -672,7 +665,7 @@ plot_price_evolution <- function(
                 marker = NULL,
                 x = ~date,
                 y = ~value,
-                name = "Value ($)", 
+                name = trace_name, 
                 line = list(color = evolution,
                             width = 1.7), 
                 legendgroup = legend_group)
@@ -684,7 +677,7 @@ plot_price_evolution <- function(
                 marker = NULL,
                 x = ~date,
                 y = ~value,
-                name = "Value ($)",
+                name = trace_name,
                 yaxis = yaxis, 
                 line = list(color = evolution,
                             width = 1.7), 
@@ -696,12 +689,11 @@ plot_price_evolution <- function(
   
 }
 
-# --- Portfolio
-
-portfolio_evolution <- function(portfolio_value, portfolio_returns){
+plot_evolution <- function(price_dat, returns_dat){
+  "Combine price evolution and cumulative returns plots."
   
-  data <- merge(x = portfolio_value, 
-                y = portfolio_returns, 
+  data <- merge(x = price_dat, 
+                y = returns_dat, 
                 by = "date") 
   
   plot_ly(data) %>%
@@ -979,7 +971,7 @@ plot_portfolio_predictions <- function(portfolio_value_pred, start_date){
               x = ~date,
               y = ~value,
               name = "Observed",
-              line = list(width = 1.2, 
+              line = list(width = 1.7, 
                           color = evolution)) %>%
     add_trace(type = "scatter", 
               mode = "lines",
