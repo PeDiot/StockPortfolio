@@ -5,14 +5,12 @@ source("setup.R", encoding = "UTF-8")
 
 # Data --------------------------------------------------------------------
 
-load(paste0(backup, "symbols.RData"))
-tickers <- symbols %>% pull(tickers) 
-names(tickers) <- rownames(symbols)
-
-# yahoo finance data
 date_init <- today() - years(5)
 yf_data <- get_tq_data(tickers = tickers, 
-                       start_date = date_init) 
+                       start_date = date_init) %>%
+  lapply(distinct, 
+         date, 
+         .keep_all = T)
 
 save_data_list(df_list = yf_data)
 
@@ -24,7 +22,7 @@ save_data_list(df_list = yf_data)
 
 ## Launch Python script -----
 
-# reticulate::py_run_file("stock_prediction.py")
+reticulate::py_run_file("stock_prediction.py")
 
 # User Interface ----------------------------------------------------------
 
@@ -92,8 +90,8 @@ ui <- fluidPage(
                                               infoBoxOutput("port_last_cumret")), 
                                      br(), 
                                      div(plotlyOutput("portfolio_evolution", 
-                                                      height = 600, 
-                                                      width = 700),
+                                                      height = 700, 
+                                                      width = 800),
                                          align = "center")),
                             
                             ### portfolio composition -----
@@ -103,7 +101,7 @@ ui <- fluidPage(
                                               format(Sys.Date(), "%d/%m/%Y") ), 
                                         align = "center"),
                                      div(plotlyOutput("portfolio_composition", 
-                                                      height = 400, 
+                                                      height = 500, 
                                                       width = 800), 
                                          align = "center"), 
                                      br(),
@@ -154,36 +152,45 @@ ui <- fluidPage(
                         ### financial data viz -----
                         mainPanel( 
                           tabsetPanel(
+                            tabPanel("Price and returns", 
+                                     br(), 
+                                     br(), 
+                                     fluidRow(column(width = 2), 
+                                              infoBoxOutput("asset_last_price"),
+                                              column(width = 1), 
+                                              infoBoxOutput("asset_last_cumret")), 
+                                     br(), 
+                                     div(plotlyOutput("asset_evolution", 
+                                                      height = 700, 
+                                                      width = 800),
+                                         align = "center")),
                             tabPanel("Candlestick",
                                      br(), 
                                      br(), 
                                      br(), 
-                                     div(plotlyOutput("candlestick_plot", 
-                                                  height = 400, 
-                                                  width = 700), 
-                                         align = "center"), 
                                      br(), 
-                                     br(),
-                                     fluidRow(column(width = 2), 
-                                              infoBoxOutput("asset_last_price"),
-                                              column(width = 1), 
-                                              infoBoxOutput("asset_last_cumret"))),
+                                     br(), 
+                                     br(), 
+                                     div(plotlyOutput("candlestick_plot", 
+                                                  height = 500, 
+                                                  width = 800), 
+                                         align = "center")),
                             
                             tabPanel("MACD",
                                      br(), 
                                      br(), 
                                      br(), 
                                      div(plotlyOutput("macd_plot", 
-                                                  height = 600, 
-                                                  width = 700), 
+                                                  height = 700, 
+                                                  width = 800), 
                                          align = "center")), 
                             tabPanel("RSI",
                                      br(), 
                                      br(), 
                                      br(), 
                                      div(plotlyOutput("rsi_plot", 
-                                                  height = 600, 
-                                                  width = 700), 
+                                                  height = 700, 
+                                                  width = 800), 
                                      align = "center")),
                           )
                         )
@@ -216,9 +223,12 @@ ui <- fluidPage(
                           br(), 
                           br(), 
                           br(), 
+                          br(), 
+                          br(), 
+                          br(), 
                           div(plotlyOutput("portfolio_pred_plot", 
-                                           height = 400, 
-                                           width = 700), 
+                                           height = 500, 
+                                           width = 800), 
                               align = "center")
                         )
                       )
@@ -290,8 +300,8 @@ server <- function(input, output) {
       
       ### data viz -----
       output$portfolio_evolution <- renderPlotly({
-        portfolio_evolution(port_value, 
-                            port_cumret)
+        plot_evolution(price_dat = port_value, 
+                       returns_dat = port_cumret)
       })
       
       output$port_last_cumret <- renderInfoBox({
@@ -322,7 +332,7 @@ server <- function(input, output) {
       })
       
       
-      ## financial indicators ----------
+      ## financial indicators per asset----------
       prices <- yf_data[[input$ticker]] %>%
         filter(date >= input$buy_date) %>%
         add_moving_avg(window = 20) %>%
@@ -330,6 +340,16 @@ server <- function(input, output) {
         add_moving_avg(window = 100) %>%
         add_macd() %>%
         add_rsi()
+      
+      asset_cumret <- assets_cumret %>%
+        filter(ticker == input$ticker)
+      
+      ### asset's global evolution -----
+      output$asset_evolution <- renderPlotly({
+        plot_evolution(price_dat = prices %>%
+                         rename(value = close), 
+                       returns_dat = asset_cumret)
+      })
       
       ### asset's last price -----
       output$asset_last_price <- renderInfoBox({
@@ -340,9 +360,6 @@ server <- function(input, output) {
       })
       
       ### asset's last cumulative returns -----
-      asset_cumret <- assets_cumret %>%
-        filter(ticker == input$ticker)
-      
       output$asset_last_cumret <- renderInfoBox({
         last_cumret <- get_current_cumret(asset_cumret)
         infoBox_port_cumret(last_cumret)
