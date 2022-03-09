@@ -7,14 +7,11 @@ source("setup.R", encoding = "UTF-8")
 
 date_init <- today() - years(5)
 yf_data <- get_tq_data(tickers = tickers, 
-                       start_date = date_init) %>%
-  lapply(distinct, 
-         date, 
-         .keep_all = T)
+                       start_date = date_init) 
 
-save_data_list(df_list = yf_data)
+# save_data_list(df_list = yf_data)
 
-# Backup predicted values --------------------------------------------------------------------
+# Predict new values for each stock --------------------------------------------------------------------
 
 ## Virtual environment -----
 
@@ -22,7 +19,11 @@ save_data_list(df_list = yf_data)
 
 ## Launch Python script -----
 
-reticulate::py_run_file("stock_prediction.py")
+# reticulate::py_run_file("stock_prediction.py")
+
+## Predictions -----
+
+# load(file =paste0(backup, "stock_predictions.RData"))
 
 # User Interface ----------------------------------------------------------
 
@@ -90,8 +91,8 @@ ui <- fluidPage(
                                               infoBoxOutput("port_last_cumret")), 
                                      br(), 
                                      div(plotlyOutput("portfolio_evolution", 
-                                                      height = 700, 
-                                                      width = 800),
+                                                      height = 600, 
+                                                      width = 700),
                                          align = "center")),
                             
                             ### portfolio composition -----
@@ -161,8 +162,8 @@ ui <- fluidPage(
                                               infoBoxOutput("asset_last_cumret")), 
                                      br(), 
                                      div(plotlyOutput("asset_evolution", 
-                                                      height = 700, 
-                                                      width = 800),
+                                                      height = 600, 
+                                                      width = 700),
                                          align = "center")),
                             tabPanel("Candlestick",
                                      br(), 
@@ -278,11 +279,12 @@ server <- function(input, output) {
       assets_value_list <- compute_assets_value(data = yf_data, 
                                                 num_shares = num_shares) 
       
-      ## value -----
       assets_value <- assets_value_list %>%
-        bind_rows() %>%
-        filter(date >= input$start_date) 
-      port_value <- get_portfolio_value(assets_value)
+        bind_rows()
+      
+      ## portfolio value -----
+      port_value <- get_portfolio_value(assets_value %>%
+                                          filter(date >= input$start_date))
       
       output$port_last_val <- renderInfoBox({
         val <- get_current_value(data = port_value) 
@@ -290,18 +292,19 @@ server <- function(input, output) {
         
       })
       
-      ### cumulative returns -----
-      returns <- assets_value %>%
+      ### portfolio returns -----
+      weighted_ret <- assets_value %>%
+        filter(date >= input$start_date) %>%
         compute_daily_returns() %>%
         compute_weighted_returns(num_shares = num_shares) 
       
-      port_cumret <- returns %>%
+      port_cumret <- weighted_ret %>%
         compute_cumulative_returns()
       
       ### data viz -----
       output$portfolio_evolution <- renderPlotly({
         plot_evolution(price_dat = port_value, 
-                       returns_dat = port_cumret)
+                       returns_dat = port_cumret) 
       })
       
       output$port_last_cumret <- renderInfoBox({
@@ -309,31 +312,34 @@ server <- function(input, output) {
         infoBox_port_cumret(last_cumret)
       })
       
-      ## composition ----------
+      ## portfolio composition ----------
       
-      ### cumulative returns -----
-      assets_cumret <- returns %>%
-        compute_cumulative_returns(all = F)
+      ### best and worst -----
+      best_asset <- get_best_asset(assets_cumret = weighted_ret %>%
+                                     compute_cumulative_returns(all = F)) 
+      worst_asset <- get_worst_asset(assets_cumret = weighted_ret %>%
+                                       compute_cumulative_returns(all = F)) 
       
       ### data viz -----
       output$portfolio_composition <- renderPlotly({
         assets_value %>%
+          filter(date >= input$start_date) %>%
           portfolio_composition()
       })
       
       output$best_asset_cumret <- renderInfoBox({
-        best_asset <- get_best_asset(assets_cumret) 
         infoBox_asset_cumret(best_asset, type = "best")
       })
       
       output$worst_asset_cumret <- renderInfoBox({
-        worst_asset <- get_worst_asset(assets_cumret) 
         infoBox_asset_cumret(worst_asset, type = "worst")
       })
       
       
       ## financial indicators per asset----------
-      prices <- yf_data[[input$ticker]] %>%
+      
+      ### asset data with indicators -----
+      prices <- assets_value_list[[input$ticker]] %>%
         filter(date >= input$buy_date) %>%
         add_moving_avg(window = 20) %>%
         add_moving_avg(window = 50) %>%
@@ -341,12 +347,19 @@ server <- function(input, output) {
         add_macd() %>%
         add_rsi()
       
-      asset_cumret <- assets_cumret %>%
-        filter(ticker == input$ticker)
+      ### asset returns -----
+      daily_ret <- assets_value_list[[input$ticker]] %>%
+        filter(date >= input$buy_date) %>%
+        compute_daily_returns() 
+      weighted_ret <- daily_ret %>%
+        compute_weighted_returns(num_shares = num_shares)
+      asset_cumret <- weighted_ret %>%
+        compute_cumulative_returns(all = F)
       
       ### asset's global evolution -----
       output$asset_evolution <- renderPlotly({
         plot_evolution(price_dat = prices %>%
+                         dplyr::select( c(date, close) ) %>%
                          rename(value = close), 
                        returns_dat = asset_cumret)
       })
@@ -354,6 +367,7 @@ server <- function(input, output) {
       ### asset's last price -----
       output$asset_last_price <- renderInfoBox({
         val <- get_current_value(data = prices %>%
+                                   dplyr::select( c(date, close) ) %>%
                                    rename(value = close))  
         infoBox_last_price(last_val = val)
         
