@@ -56,9 +56,15 @@ save_data_list <- function(df_list){
   names <- names(df_list)
   n_dfs <- length(df_list)
   sapply(seq_along(1:n_dfs), 
-         function(i) write_feather(df_list[[i]] %>%
-                                     filter(date >= today() - months(12)), 
-                                   paste0(backup, "assets/", names[i],".feather")))
+         function(i){
+           write_feather(
+             x = df_list[[i]] %>%
+               filter(date >= today() - months(12)), 
+             path = paste0("./backup/assets/", names[i],".feather")
+             )
+           }
+  )
+  
 }
 
 save_num_shares <- function(num_shares){
@@ -182,7 +188,7 @@ cumret_to_percent <- function(cr){
   
 }
 
-# ----- Portfolio Value -----
+# ----- Value -----
 
 compute_assets_value <- function(data, num_shares){
   "Return assets' value given prices and number of shares."
@@ -218,12 +224,25 @@ get_portfolio_value <- function(assets_value){
 }
 
 get_current_value <- function(data){
-  "Return portfolio value at last date." 
+  "Return value (price * number of shares) at last date." 
   
   data %>%
     filter(date == max(date)) %>%
     head(n = 1) %>%
     pull(value) %>%
+    round(2) %>%
+    format(big.mark = ",", 
+           decimal.mark = ".", 
+           scientific = F)
+}
+
+get_current_price <- function(data){
+  "Return price at last date." 
+  
+  data %>%
+    filter(date == max(date)) %>%
+    head(n = 1) %>%
+    pull(close) %>%
     round(2) %>%
     format(big.mark = ",", 
            decimal.mark = ".", 
@@ -930,6 +949,44 @@ macd_chart <- function(ticker, price_data){
   
 }
 
+ic_alpha <- function(alpha, acf_res){
+  "Confidence interval for ACF."
+  
+  ic <- qnorm((1 + (1 - alpha))/2)/sqrt(acf_res$n.used)
+  return(ic)
+  
+}
+
+ggplot_acf_pacf <- function(
+  res_,
+  n_lag,
+  label,
+  alpha= 0.05
+){
+  
+  df_ <- with(res_, 
+              data.frame(lag, acf)) %>%
+    filter(lag <= n_lag)
+  
+  lim1 <-  ic_alpha(alpha, res_) ; lim0 <- -lim1
+  
+  p <- ggplot(data = df_, 
+         mapping = aes(x = lag, y = acf)) +
+    geom_hline(aes(yintercept = 0)) +
+    geom_segment(mapping = aes(xend = lag, 
+                               yend = 0)) +
+    labs(y= label) +
+    geom_hline(aes(yintercept = lim1), 
+               linetype = 2,
+               color = "blue") +
+    geom_hline(aes(yintercept = lim0), 
+               linetype = 2, 
+               color = "blue") 
+  
+  ggplotly(p) 
+  
+}
+
 rsi_chart <- function(ticker, price_data){
   "Build plotly chart for RSI signal and bounds."
   
@@ -1052,19 +1109,35 @@ infoBox_dims <- function(
 } 
 
 
-infoBox_last_price <- function(last_val, type = "price"){
-  "Return infoBox for last price or value."
-  
-  if (type == "price"){
-    title <- "Current price"
-  }
-  if (type == "value"){
-    title <- "Current value"
-  }
-  infoBox(title = title,
-          value = last_val,
+infoBox_last_price <- function(last_price){
+  "Return infoBox for last price."
+
+  infoBox(title = "Current price",
+          value = last_price,
           color = "light-blue", 
           icon = tags$i(class = "fas fa-dollar-sign", 
+                        style = "font-size: 20px"), 
+          fill = F)
+}
+
+infoBox_last_value <- function(last_val){
+  "Return infoBox for last value"
+  
+  infoBox(title = "Current value",
+          value = paste(last_val, "$"), 
+          color = "purple", 
+          icon = tags$i(class = "fas fa-money-check", 
+                        style = "font-size: 20px"), 
+          fill = F)
+}
+
+infoBox_num_shares <- function(num_shares){
+  "Return infoBox for number of shares."
+  
+  infoBox(title = "Number of shares",
+          value = num_shares, 
+          color = "aqua", 
+          icon = tags$i(class = "fas fa-wallet", 
                         style = "font-size: 20px"), 
           fill = F)
 }
