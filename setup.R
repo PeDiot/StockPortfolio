@@ -1,9 +1,5 @@
 options(warn = -1)
 
-# ----- Directories -----
-backup <- "./backup/"
-pred_path <- paste0(backup, "stock_predictions.RData") 
-
 # ----- Colors -----
 
 evolution <- "#709ABE"
@@ -20,9 +16,35 @@ rsi <- "#F3B0DE"
 
 theme_set(theme_minimal())
 
-# ----- Symbols -----
+# ----- Enter your assets -----
 
-load(paste0(backup, "symbols.RData"))
+symbols <- structure(list(
+  tickers = c("LVMUY",
+              "OR.PA", 
+              "AI.PA", 
+              "ORAN", 
+              "ECIFF",
+              "CRERF", 
+              "RNSDF", 
+              "UBSFF", 
+              "OVH.PA", 
+              "TFI.PA")
+),
+class = "data.frame", 
+row.names = c("LVMH",
+              "L'Oréal", 
+              "Air Liquide", 
+              "Orange", 
+              "EDF", 
+              "Carrefour", 
+              "Renault", 
+              "Ubisoft", 
+              "OVH Groupe", 
+              "TF1")
+
+)
+
+
 tickers <- symbols %>% pull(tickers) 
 names(tickers) <- rownames(symbols)
 
@@ -79,25 +101,45 @@ get_indicator_plot_title <- function(ticker, indicator_type){
   return(title)
 }
 
+clean_tq_data <- function(df){
+  "Remove duplicated rows and fill NA values."
+  
+  df %>%
+    distinct(date, 
+             .keep_all = T) %>%
+    mutate(ticker = na.locf(ticker), 
+           close = na.locf(close))
+
+}
+
 get_tq_data <- function(tickers, start_date){
   "Return price data for given asset and period."
   
   if (length(tickers) == 1){
-    tq_get(x = tickers, 
+    
+    dat <- tq_get(x = tickers, 
            get = "stock.prices", 
            from = start_date,
            to = today(),
-           complete_cases = T)
+           complete_cases = T) %>%
+      clean_tq_data()
+    
+    return(dat)
+    
   }
   else {
+    
     dat <- tq_get(x = tickers, 
                   get = "stock.prices", 
                   from = start_date,
                   to = today(),
                   complete_cases = T)
     colnames(dat)[1] <- "ticker"  
-    df_list <- split(dat, dat$ticker)
+    df_list <- split(dat, dat$ticker) %>%
+      lapply(clean_tq_data)
+    
     return(df_list)
+    
   }
   
 }
@@ -195,27 +237,30 @@ compute_daily_returns <- function(assets_value){
   "Calculate the daily returns and for our assets."
   
   if (assets_value %>%
-      pull(ticker) %>%
-      unique() %>%
-      length() == 1){
+        pull(ticker) %>%
+        unique() %>%
+        length() == 1){
     returns <- assets_value %>%
       complete(date = seq.Date(min(date), max(date), by="day")) %>%
-      fill(close) %>%
-      tq_transmute(select = close,
+      fill(c(ticker, close)) %>%
+      tq_mutate(select = close,
                    mutate_fun = periodReturn,
                    period = "daily",
-                   col_rename = "ret") 
+                   col_rename = "ret") %>%
+      select(c(ticker,
+               date, 
+               ret))
   }
   else{
     returns <- assets_value %>%
       group_by(ticker) %>%
       complete(date = seq.Date(min(date), max(date), by="day")) %>%
-      fill(value) %>%
+      fill(c(close, ticker)) %>%
       group_by(ticker) %>%
       tq_transmute(select = close,
                    mutate_fun = periodReturn,
                    period = "daily",
-                   col_rename = "ret") 
+                   col_rename = "ret")
   }
   
   return(returns)
