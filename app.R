@@ -1,7 +1,8 @@
 # Setup -------------------------------------------------------------------
 
 source("Rpackages.R")
-source("setup.R", encoding = "UTF-8")
+source("setup.R", 
+       encoding = "UTF-8")
 
 # Data --------------------------------------------------------------------
 
@@ -9,7 +10,7 @@ date_init <- today() - years(5)
 yf_data <- get_tq_data(tickers = tickers, 
                        start_date = date_init) 
 
-# save_data_list(df_list = yf_data)
+save_data_list(df_list = yf_data)
 
 # Predict new values for each stock --------------------------------------------------------------------
 
@@ -23,7 +24,7 @@ yf_data <- get_tq_data(tickers = tickers,
 
 ## Predictions -----
 
-# load(file =paste0(backup, "stock_predictions.RData"))
+load(file = "./backup/stock_predictions.RData") 
 
 # User Interface ----------------------------------------------------------
 
@@ -140,26 +141,41 @@ ui <- fluidPage(
                           br(), 
                           br(), 
                           br(), 
+                          h4("When did you buy the stock?"), 
                           dateInput(inputId = "buy_date",
-                                    label = h4("When did you buy the stock?"),
+                                    label = "",
                                     width = "200px",  
                                     value = today() - months(6),
                                     min = date_init, 
                                     max = today(),
-                                    format = "yyyy-mm-dd")
+                                    format = "yyyy-mm-dd"), 
+                          br(), 
+                          br(), 
+                          br(), 
+                          br(), 
+                          br(),  
+                          h4("How many lags for ACF/PACF?"), 
+                          numericInput("n_lag",
+                                       label = "",
+                                       min = 1,
+                                       max = 100,
+                                       value = 20, 
+                                       width = "100px")
                           
                         ),
                         
                         ### financial data viz -----
                         mainPanel( 
                           tabsetPanel(
-                            tabPanel("Price and returns", 
+                            tabPanel("Price & Returns", 
                                      br(), 
                                      br(), 
-                                     fluidRow(column(width = 2), 
-                                              infoBoxOutput("asset_last_price"),
-                                              column(width = 1), 
-                                              infoBoxOutput("asset_last_cumret")), 
+                                     fluidRow(infoBoxOutput("asset_num_shares", 
+                                                            width = 4),
+                                              infoBoxOutput("asset_last_price", 
+                                                            width = 4),
+                                              infoBoxOutput("asset_last_cumret", 
+                                                            width = 4)), 
                                      br(), 
                                      div(plotlyOutput("asset_evolution", 
                                                       height = 600, 
@@ -193,6 +209,21 @@ ui <- fluidPage(
                                                   height = 700, 
                                                   width = 800), 
                                      align = "center")),
+                            tabPanel("ACF", 
+                                     br(),
+                                     h4("Auto-Correlation Function", 
+                                        align = "center"), 
+                                     div(plotlyOutput("acf", 
+                                                      height = 300, 
+                                                      width = 600), 
+                                         align = "center"),
+                                     br(), 
+                                     h4("Partial Auto-Correlation Function", 
+                                        align = "center"), 
+                                     div(plotlyOutput("pacf", 
+                                                      height = 300, 
+                                                      width = 600), 
+                                         align = "center")) 
                           )
                         )
                       
@@ -288,7 +319,7 @@ server <- function(input, output) {
       
       output$port_last_val <- renderInfoBox({
         val <- get_current_value(data = port_value) 
-        infoBox_last_price(last_val = val, type = "value")
+        infoBox_last_value(last_val = val)
         
       })
       
@@ -356,7 +387,7 @@ server <- function(input, output) {
       asset_cumret <- weighted_ret %>%
         compute_cumulative_returns(all = F)
       
-      ### asset's global evolution -----
+      ### asset global evolution -----
       output$asset_evolution <- renderPlotly({
         plot_evolution(price_dat = prices %>%
                          dplyr::select( c(date, close) ) %>%
@@ -364,16 +395,20 @@ server <- function(input, output) {
                        returns_dat = asset_cumret)
       })
       
-      ### asset's last price -----
+      ### asset last price -----
       output$asset_last_price <- renderInfoBox({
-        val <- get_current_value(data = prices %>%
-                                   dplyr::select( c(date, close) ) %>%
-                                   rename(value = close))  
-        infoBox_last_price(last_val = val)
+        val <- get_current_price(data = prices)  
+        infoBox_last_price(last_price = val)
         
       })
       
-      ### asset's last cumulative returns -----
+      ### asset number of shares ----
+      output$asset_num_shares <- renderInfoBox({
+        infoBox_num_shares(num_shares = num_shares[input$ticker])
+      })
+      
+      
+      ### asset last cumulative returns -----
       output$asset_last_cumret <- renderInfoBox({
         last_cumret <- get_current_cumret(asset_cumret)
         infoBox_port_cumret(last_cumret)
@@ -397,11 +432,26 @@ server <- function(input, output) {
           rsi_chart(ticker = input$ticker) 
       })
       
+      ### ACF/PACF -----
+      output$acf <- renderPlotly({
+        ts <- daily_ret %>%
+          pull(ret)
+        ggplot_acf_pacf(res_= acf(ts, plot= F), 
+                        n_lag = input$n_lag,
+                        label= "ACF") 
+      })
+      output$pacf <- renderPlotly({
+        ts <- daily_ret %>%
+          pull(ret)
+        ggplot_acf_pacf(res_= acf(ts, plot= F), 
+                        n_lag = input$n_lag,
+                        label= "PACF") 
+      })
+      
       
       ## predictions ----------
       
       ### format data -----
-      load(file = pred_path)
       predictions <- get_predicted_data(predictions, 
                                         tickers,
                                         num_shares)
