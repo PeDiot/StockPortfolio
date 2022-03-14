@@ -116,8 +116,9 @@ clean_tq_data <- function(df){
     distinct(date, 
              .keep_all = T) %>%
     mutate(ticker = na.locf(ticker), 
-           close = na.locf(close))
-
+           close = na.locf(close)) %>%
+    complete(date = seq.Date(min(date), max(date), by="day")) %>%
+    fill(everything())
 }
 
 get_tq_data <- function(tickers, start_date){
@@ -312,18 +313,12 @@ compute_cumulative_returns <- function(ret_data, all = T){
     cum_returns <- ret_data %>%
       group_by(date) %>%
       summarise(port_ret = sum(wt_return)) %>%
-      mutate(cr = cumprod(1 + port_ret)) %>%
-      mutate(move = case_when(cr > 1 ~ "Up", 
-                              TRUE ~ "Down") %>%
-               as.factor())
+      mutate(cr = cumprod(1 + port_ret)) 
   }
   else{
     cum_returns <- ret_data %>%
       group_by(ticker) %>%
-      mutate(cr = cumprod(1 + wt_return)) %>%
-      mutate(move = case_when(cr > 1 ~ "Up", 
-                              TRUE ~ "Down") %>%
-               as.factor())
+      mutate(cr = cumprod(1 + wt_return)) 
   }
   
   return(cum_returns)
