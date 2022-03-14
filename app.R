@@ -36,8 +36,57 @@ ui <- fluidPage(
   
   tags$head(tags$style(infoBox_dims())),
   
-  navbarPage("My Stock Portfolio", 
+  navbarPage("Your Stock Portfolio", 
              theme = shinytheme("lumen"), 
+             
+             ## home ----------
+             tabPanel(title = "", 
+                      icon = icon("home"), 
+                      h1("Welcolme To Your Stock Portfolio!", align = "center"),
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      column(width = 12, 
+                             imageOutput("home_img"), 
+                             align = "center"), 
+                      br(),
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(),
+                      br(), 
+                      br(), 
+                      hr(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      br(), 
+                      hr(), 
+                      h4(strong("About the app")),
+                      p(style="text-align: justify; font-size = 25px",
+                        "This stock portfolio ",
+                        strong("monitoring tool"), 
+                        " will help you ", 
+                        strong("boosting your returns."),  
+                        "The app provides multiple ", 
+                        strong("data vizualisations "),
+                        "and ", 
+                        strong("financial analysis."), 
+                        " Go to",
+                        a(href = "https://github.com/PeDiot/StockPortfolio",
+                          icon("github")),
+                        "to find more details on the source code."), 
+                      hr()), 
              
              ## portfolio value ----------
              tabPanel("Portfolio Value", 
@@ -139,6 +188,7 @@ ui <- fluidPage(
                           br(), 
                           selectInput("ticker", 
                                       label = h4("Which asset?"), 
+                                      width = "200px", 
                                       choices = tickers, 
                                       selected = "LVMH"),
                           br(), 
@@ -298,6 +348,7 @@ ui <- fluidPage(
                    br(), 
                    selectInput("ticker_dat", 
                                label = h4("Which asset?"), 
+                               width = "200px", 
                                choices = tickers, 
                                selected = "LVMH"),
                    br(), 
@@ -329,9 +380,28 @@ ui <- fluidPage(
                      .noWS = c("after-begin", "before-end")) 
                  ), 
                  
-                 mainPanel(dataTableOutput(outputId = "data"))
+                 mainPanel(
+                   tabsetPanel(
+                     tabPanel("Yahoo Finance", 
+                              dataTableOutput(outputId = "data")), 
+                     tabPanel("Returns", 
+                              dataTableOutput(outputId = "ret_data")), 
+                     tabPanel("Indicators", 
+                              dataTableOutput(outputId = "indicators_data"))
+                   ) 
+                 )
                 
               )
+              
+            ), 
+            
+            ## Documentation ----------
+            navbarMenu(
+              "Documentation", 
+              icon = icon("book"), 
+              
+              tabPanel("Financial Analysis"), 
+              tabPanel("Neural Networks")
               
             )
                           
@@ -360,8 +430,18 @@ server <- function(input, output) {
       input$buy_date, 
       input$pred_start_date, 
       input$ticker_dat, 
-      input$dat_start_date), 
+      input$dat_start_date, 
+      input$checkbox_returns), 
     {
+      
+      ## home image ----------
+      output$home_img <- renderImage({
+        
+        list(src = "home_img.png", 
+             width = 350,
+             height = 350)
+        
+      }, deleteFile = F)
       
       ## portfolio ----------
       
@@ -510,7 +590,6 @@ server <- function(input, output) {
           rsi_chart(ticker = input$ticker) 
       })
       
-      
       ## predictions ----------
       
       ### format data -----
@@ -550,18 +629,49 @@ server <- function(input, output) {
         filter(date >= input$dat_start_date) %>%
         select(-c(n_shares, value))
       
-      output$data <- renderDataTable({ dat })
+      ret_dat <- dat %>%
+        compute_daily_returns() %>%
+        compute_weighted_returns(num_shares = num_shares) %>%
+        compute_cumulative_returns(all = F) %>%
+        select(c(ticker, 
+                 date, 
+                 ret, 
+                 wt_return, 
+                 cr)) %>%
+        rename(returns = ret, 
+               weighted_returns = wt_return, 
+               cumulative_returns = cr)
+      
+      indicators_dat <- dat %>% 
+        add_moving_avg(window = 20) %>%
+        add_moving_avg(window = 50) %>%
+        add_moving_avg(window = 100) %>%
+        add_macd() %>%
+        add_rsi() %>%
+        select(c(ticker, 
+                 date,
+                 close, 
+                 MA20:RSI)) 
+      
+      output$data <- renderDataTable({ dat %>% arrange(desc(date)) })
+      output$ret_data <- renderDataTable({ ret_dat %>% arrange(desc(date)) })
+      output$indicators_data <- renderDataTable({ indicators_dat %>% arrange(desc(date)) })
       
       output$download <- downloadHandler(
         filename <- function() {
           paste0(input$ticker_dat,
                  "_", 
                  input$dat_start_date, 
-                 ".csv")
+                 "_", 
+                 today(), 
+                 ".xlsx")
         },
         content <- function(file) {
-          write.csv(dat, file, row.names = FALSE)
-        }
+          write_xlsx(x = list("Yahoo Finance Data" = dat, 
+                              "Returns" = ret_dat, 
+                              "Financial Indicators" = indicators_dat), 
+                     path = file)
+          }
       )
       
     }
