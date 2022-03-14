@@ -11,6 +11,8 @@ long <- "black"
 macd <- "#C47D72"
 macdHist <- "#B5CDD2"
 rsi <- "#F3B0DE"
+bbands <- "#CACED2"
+pctBB <- "#5EB6B1"
 
 # ----- GGplot theme -----
 
@@ -484,6 +486,26 @@ get_ma_signals <- function(
   
 }
 
+calculate_bbands <- function(
+  price_data,
+  n_periods = 20,
+  sd = 2
+){
+  "Compute bollinger bands and %B."
+  
+  closes <- price_data %>% pull(close)
+  dates <- price_data %>%
+    pull(date)
+  
+  BBands(HLC = closes, 
+         n = n_periods, 
+         sd = sd) %>%
+    data.frame() %>%
+    mutate(date = dates, 
+           close = closes) 
+  
+}
+
 add_macd <- function(
   price_data, 
   ema_short = 12, 
@@ -883,6 +905,75 @@ candlestick_chart <- function(ticker, price_data){
   
 }
 
+bbands_chart <- function(bbands_dat, ticker){
+  "Build plotly chart whith prices, bollinger bands and %B."
+  p <- plot_ly(bbands_dat) %>%
+    add_trace(type = "scatter", 
+              mode = "lines",
+              marker = NULL,
+              x = ~date,
+              y = ~close,
+              name = "Close", 
+              line = list(color = evolution,
+                          width = 1.2), 
+              yaxis = "y1") %>%
+    add_trace(type = "scatter", 
+              mode = "lines",
+              marker = NULL,
+              x = ~date,
+              y = ~mavg,
+              name = "MA20", 
+              line = list(color = short,
+                          dash = "dot", 
+                          width = 1.7), 
+              yaxis = "y1") %>%
+    add_trace(type = "scatter", 
+              mode = "lines",
+              marker = NULL,
+              x = ~date,
+              y = ~dn, 
+              name = "Lower", 
+              line = list(color = bbands,
+                          width = .9), 
+              yaxis = "y1") %>%
+    add_trace(type = "scatter", 
+              mode = "lines",
+              marker = NULL,
+              x = ~date,
+              y = ~up, 
+              name = "Upper", 
+              line = list(color = bbands,
+                          width = .9), 
+              yaxis = "y1") %>%
+    add_trace(type = "scatter", 
+              mode = "lines",
+              marker = NULL,
+              x = ~date,
+              y = ~pctB, 
+              name = "%B", 
+              line = list(color = pctBB,
+                          width = 1), 
+              yaxis = "y2")
+  
+  title <- get_indicator_plot_title(ticker, 
+                                    indicator_type = "Bollinger Bands")
+  p %>%
+    layout(title = title,
+           xaxis = list(rangeslider = list(visible = F), 
+                        rangeselector = range_selector_period(y_pos = -0.15), 
+                        title = ""),
+           yaxis = list(domain = c(.40, 1),
+                        fixedrange = FALSE,
+                        tickfont = list(color = evolution), 
+                        title = "$"),
+           yaxis2 = list(domain = c(0, .30),
+                         fixedrange = FALSE,
+                         tickfont = list(color = pctBB), 
+                         title = ""), 
+           legend = plotly_legend())
+  
+}
+
 macd_chart <- function(ticker, price_data){
   "Build plotly chart for MACD and MACD signal."
   
@@ -949,44 +1040,6 @@ macd_chart <- function(ticker, price_data){
   
 }
 
-ic_alpha <- function(alpha, acf_res){
-  "Confidence interval for ACF."
-  
-  ic <- qnorm((1 + (1 - alpha))/2)/sqrt(acf_res$n.used)
-  return(ic)
-  
-}
-
-ggplot_acf_pacf <- function(
-  res_,
-  n_lag,
-  label,
-  alpha= 0.05
-){
-  
-  df_ <- with(res_, 
-              data.frame(lag, acf)) %>%
-    filter(lag <= n_lag)
-  
-  lim1 <-  ic_alpha(alpha, res_) ; lim0 <- -lim1
-  
-  p <- ggplot(data = df_, 
-         mapping = aes(x = lag, y = acf)) +
-    geom_hline(aes(yintercept = 0)) +
-    geom_segment(mapping = aes(xend = lag, 
-                               yend = 0)) +
-    labs(y= label) +
-    geom_hline(aes(yintercept = lim1), 
-               linetype = 2,
-               color = "blue") +
-    geom_hline(aes(yintercept = lim0), 
-               linetype = 2, 
-               color = "blue") 
-  
-  ggplotly(p) 
-  
-}
-
 rsi_chart <- function(ticker, price_data){
   "Build plotly chart for RSI signal and bounds."
   
@@ -1006,7 +1059,7 @@ rsi_chart <- function(ticker, price_data){
               y = ~RSI,
               name = "RSI",
               line = list(color = rsi,
-                          width = 1.5), 
+                          width = 1.2), 
               legend_group = "two",  
               yaxis = "y2") %>%
     add_trace(type = "scatter", 
@@ -1041,17 +1094,55 @@ rsi_chart <- function(ticker, price_data){
            xaxis = list(rangeslider = list(visible = F), 
                         rangeselector = range_selector_period(y_pos = -0.15), 
                         title = ""),
-           yaxis = list(domain = c(0.55, 1),
+           yaxis = list(domain = c(0.45, 1),
                         fixedrange = FALSE,
                         tickfont = list(color = evolution), 
                         title = "$"), 
-           yaxis2 = list(domain = c(0, 0.45),
+           yaxis2 = list(domain = c(0, 0.35),
                          fixedrange = FALSE, 
                          tickfont = list(color = rsi), 
                          title = ""), 
            legend = plotly_legend())
   
   return(p)
+  
+}
+
+ic_alpha <- function(alpha, acf_res){
+  "Confidence interval for ACF."
+  
+  ic <- qnorm((1 + (1 - alpha))/2)/sqrt(acf_res$n.used)
+  return(ic)
+  
+}
+
+ggplot_acf_pacf <- function(
+  res_,
+  n_lag,
+  label,
+  alpha= 0.05
+){
+  
+  df_ <- with(res_, 
+              data.frame(lag, acf)) %>%
+    filter(lag <= n_lag)
+  
+  lim1 <-  ic_alpha(alpha, res_) ; lim0 <- -lim1
+  
+  p <- ggplot(data = df_, 
+              mapping = aes(x = lag, y = acf)) +
+    geom_hline(aes(yintercept = 0)) +
+    geom_segment(mapping = aes(xend = lag, 
+                               yend = 0)) +
+    labs(y= label) +
+    geom_hline(aes(yintercept = lim1), 
+               linetype = 2,
+               color = "blue") +
+    geom_hline(aes(yintercept = lim0), 
+               linetype = 2, 
+               color = "blue") 
+  
+  ggplotly(p) 
   
 }
 
