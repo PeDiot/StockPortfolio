@@ -10,7 +10,7 @@ date_init <- today() - years(5)
 yf_data <- get_tq_data(tickers = tickers, 
                        start_date = date_init) 
 
-save_data_list(df_list = yf_data)
+# save_data_list(df_list = yf_data)
 
 # Predict new values for each stock --------------------------------------------------------------------
 
@@ -47,9 +47,11 @@ ui <- fluidPage(
                       sidebarLayout(
                         
                         ### inputs -----
-                        sidebarPanel(
-                          
+                        sidebarPanel( 
                           width = 3, 
+                          h3("Your portfolio"), 
+                          br(), 
+                          br(),
                           h4("How many shares per asset?"), 
                           num_shares_input(asset1 = "LVMH", 
                                            asset2 = "Air Liquide", 
@@ -93,7 +95,7 @@ ui <- fluidPage(
                                      br(), 
                                      div(plotlyOutput("portfolio_evolution", 
                                                       height = 600, 
-                                                      width = 700),
+                                                      width = 600),
                                          align = "center")),
                             
                             ### portfolio composition -----
@@ -121,17 +123,20 @@ ui <- fluidPage(
                       
              ),
              
-             ## financial indicators ----------
+             ## financial analysis ----------
              
-             tabPanel("Financial Indicators", 
+             tabPanel("Financial Analysis", 
                       fluid = TRUE, 
-                      icon = icon("calculator"), 
+                      icon = icon("chart-line"), 
                       
                       sidebarLayout(
                         
                         ### inputs -----
                         sidebarPanel(
                           width = 3, 
+                          h3("Stock monitoring"), 
+                          br(), 
+                          br(), 
                           selectInput("ticker", 
                                       label = h4("Which asset?"), 
                                       choices = tickers, 
@@ -148,20 +153,7 @@ ui <- fluidPage(
                                     value = today() - months(6),
                                     min = date_init, 
                                     max = today(),
-                                    format = "yyyy-mm-dd"), 
-                          br(), 
-                          br(), 
-                          br(), 
-                          br(), 
-                          br(),  
-                          h4("How many lags for ACF/PACF?"), 
-                          numericInput("n_lag",
-                                       label = "",
-                                       min = 1,
-                                       max = 100,
-                                       value = 20, 
-                                       width = "100px")
-                          
+                                    format = "yyyy-mm-dd")
                         ),
                         
                         ### financial data viz -----
@@ -179,7 +171,7 @@ ui <- fluidPage(
                                      br(), 
                                      div(plotlyOutput("asset_evolution", 
                                                       height = 600, 
-                                                      width = 700),
+                                                      width = 600),
                                          align = "center")),
                             tabPanel("Candlestick",
                                      br(), 
@@ -190,7 +182,15 @@ ui <- fluidPage(
                                      br(), 
                                      div(plotlyOutput("candlestick_plot", 
                                                   height = 500, 
-                                                  width = 800), 
+                                                  width = 700), 
+                                         align = "center")),
+                            tabPanel("Volatily",
+                                     br(), 
+                                     br(), 
+                                     br(), 
+                                     div(plotlyOutput("bbands_plot", 
+                                                      height = 700, 
+                                                      width = 700), 
                                          align = "center")),
                             
                             tabPanel("MACD",
@@ -199,7 +199,7 @@ ui <- fluidPage(
                                      br(), 
                                      div(plotlyOutput("macd_plot", 
                                                   height = 700, 
-                                                  width = 800), 
+                                                  width = 700), 
                                          align = "center")), 
                             tabPanel("RSI",
                                      br(), 
@@ -207,9 +207,63 @@ ui <- fluidPage(
                                      br(), 
                                      div(plotlyOutput("rsi_plot", 
                                                   height = 700, 
-                                                  width = 800), 
-                                     align = "center")),
-                            tabPanel("ACF", 
+                                                  width = 700), 
+                                     align = "center"))
+                          )
+                        )
+                      
+                      )
+                      
+             ), 
+          
+             
+             ## stock prediction ----------
+             tabPanel("Prediction", 
+                      fluid = TRUE, 
+                      icon = icon("calendar"), 
+                      
+                      sidebarLayout(
+                        
+                        ### inputs -----
+                        sidebarPanel(
+                          width = 3, 
+                          h3("Prediction & Time Series Analysis"),
+                          br(), 
+                          br(),
+                          dateInput(inputId = "pred_start_date",
+                                    label = h4("How far back do you want to go?"),
+                                    width = "200px",  
+                                    value = today() - months(1),
+                                    min = today() - months(3), 
+                                    max = today(),
+                                    format = "yyyy-mm-dd"), 
+                          br(), 
+                          br(), 
+                          br(), 
+                          h4("How many lags for ACF/PACF?"), 
+                          numericInput("n_lag",
+                                       label = "",
+                                       min = 1,
+                                       max = 100,
+                                       value = 20, 
+                                       width = "100px")
+                        ), 
+                        
+                        ### predictions data viz -----
+                        mainPanel(
+                          tabsetPanel(
+                            tabPanel("Overall value", 
+                                     br(), 
+                                     br(), 
+                                     br(), 
+                                     br(), 
+                                     br(), 
+                                     br(), 
+                                     div(plotlyOutput("portfolio_pred_plot", 
+                                                      height = 500, 
+                                                      width = 700), 
+                                         align = "center")),
+                            tabPanel("Auto-Correlation", 
                                      br(),
                                      h4("Auto-Correlation Function", 
                                         align = "center"), 
@@ -226,45 +280,61 @@ ui <- fluidPage(
                                          align = "center")) 
                           )
                         )
+                      ) 
                       
-                      )
-                      
-             ), 
+              ), 
              
-             ## stock prediction ----------
-             tabPanel("Prediction", 
-                      fluid = TRUE, 
-                      icon = icon("chart-line"), 
-                      
-                      sidebarLayout(
-                        
-                        ### inputs -----
-                        sidebarPanel(
-                          width = 3, 
-                          dateInput(inputId = "pred_start_date",
-                                    label = h4("How far back do you want to go?"),
-                                    width = "200px",  
-                                    value = today() - months(1),
-                                    min = today() - months(3), 
-                                    max = today(),
-                                    format = "yyyy-mm-dd")
-                        ), 
-                        
-                        ### predictions data viz -----
-                        mainPanel(
-                          br(), 
-                          br(), 
-                          br(), 
-                          br(), 
-                          br(), 
-                          br(), 
-                          div(plotlyOutput("portfolio_pred_plot", 
-                                           height = 500, 
-                                           width = 800), 
-                              align = "center")
-                        )
-                      )
-              ) 
+             ## Data ----------
+             tabPanel(
+               "Data", 
+               fluid = TRUE, 
+               icon = icon("database"), 
+               
+               sidebarLayout(
+                 sidebarPanel(
+                   width = 3, 
+                   h3("Financial data collection"),
+                   br(), 
+                   br(), 
+                   selectInput("ticker_dat", 
+                               label = h4("Which asset?"), 
+                               choices = tickers, 
+                               selected = "LVMH"),
+                   br(), 
+                   br(), 
+                   br(), 
+                   br(), 
+                   br(), 
+                   br(), 
+                   dateInput(inputId = "dat_start_date",
+                             label = h4("How far back do you want to go?"),
+                             width = "200px",  
+                             value = today() - months(6),
+                             min = date_init, 
+                             max = today(),
+                             format = "yyyy-mm-dd"), 
+                   br(), 
+                   br(), 
+                   br(), 
+                   br(), 
+                   br(), 
+                   br(),  
+                   downloadButton("download", "Download the data"),
+                   br(), 
+                   p("Data is extracted from ",
+                     a(href = "https://fr.finance.yahoo.com/", "Yahoo Finance", .noWS = "outside"),
+                     " with the ",
+                     a(href = "https://www.rdocumentation.org/packages/tidyquant/versions/0.3.0", "tidyquant", .noWS = "outside"),
+                     " package.", 
+                     .noWS = c("after-begin", "before-end")) 
+                 ), 
+                 
+                 mainPanel(dataTableOutput(outputId = "data"))
+                
+              )
+              
+            )
+                          
              
   )
   
@@ -288,7 +358,9 @@ server <- function(input, output) {
       input$start_date, 
       input$ticker,
       input$buy_date, 
-      input$pred_start_date), 
+      input$pred_start_date, 
+      input$ticker_dat, 
+      input$dat_start_date), 
     {
       
       ## portfolio ----------
@@ -420,6 +492,12 @@ server <- function(input, output) {
           candlestick_chart(ticker = input$ticker) 
       })
       
+      ### bollinger bands -----
+      bbands_dat <- calculate_bbands(price_data = prices)
+      output$bbands_plot <- renderPlotly({
+        bbands_chart(bbands_dat, input$ticker)
+      })
+      
       ### MACD -----
       output$macd_plot <- renderPlotly({
         prices %>%
@@ -430,6 +508,25 @@ server <- function(input, output) {
       output$rsi_plot <- renderPlotly({
         prices %>%
           rsi_chart(ticker = input$ticker) 
+      })
+      
+      
+      ## predictions ----------
+      
+      ### format data -----
+      predictions <- get_predicted_data(predictions, 
+                                        tickers,
+                                        num_shares)
+      final_assets_value <- add_predictions(observed_dat = assets_value_list, 
+                                            predicted_dat = predictions, 
+                                            ticker = tickers)
+      
+      ### portfolio predicted value ----
+      portfolio_value_pred <- get_portfolio_value(assets_value = final_assets_value)
+      
+      output$portfolio_pred_plot <- renderPlotly({
+        plot_portfolio_predictions(portfolio_value_pred, 
+                                   start_date = input$pred_start_date) 
       })
       
       ### ACF/PACF -----
@@ -448,24 +545,24 @@ server <- function(input, output) {
                         label= "PACF") 
       })
       
+      ## data -----
+      dat <- assets_value_list[[input$ticker_dat]] %>%
+        filter(date >= input$dat_start_date) %>%
+        select(-c(n_shares, value))
       
-      ## predictions ----------
+      output$data <- renderDataTable({ dat })
       
-      ### format data -----
-      predictions <- get_predicted_data(predictions, 
-                                        tickers,
-                                        num_shares)
-      final_assets_value <- add_predictions(observed_dat = assets_value_list, 
-                                           predicted_dat = predictions, 
-                                           ticker = tickers)
-      
-      ### portfolio predicted value ----
-      portfolio_value_pred <- get_portfolio_value(assets_value = final_assets_value)
-      
-      output$portfolio_pred_plot <- renderPlotly({
-        plot_portfolio_predictions(portfolio_value_pred, 
-                                   start_date = input$pred_start_date) 
-      })
+      output$download <- downloadHandler(
+        filename <- function() {
+          paste0(input$ticker_dat,
+                 "_", 
+                 input$dat_start_date, 
+                 ".csv")
+        },
+        content <- function(file) {
+          write.csv(dat, file, row.names = FALSE)
+        }
+      )
       
     }
   )
