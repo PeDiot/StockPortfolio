@@ -1,3 +1,5 @@
+library(writexl)
+
 library(tidyverse)
 library(data.table)
 library(plyr)
@@ -15,3 +17,4 @@ library(tidyquant)
 library(TTR)
 
 library(feather)
+
