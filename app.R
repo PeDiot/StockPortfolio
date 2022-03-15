@@ -82,10 +82,14 @@ ui <- fluidPage(
                         strong("data vizualisations "),
                         "and ", 
                         strong("financial analysis."), 
-                        " Go to",
+                        " The input data comes from the ", 
+                        a(href = "https://fr.finance.yahoo.com/", "Yahoo Finance"),
+                        " website. Ten French companies have been selected.
+                        Feel free to modify the source code in order to select your own assets. 
+                        Go to ",
                         a(href = "https://github.com/PeDiot/StockPortfolio",
                           icon("github")),
-                        "to find more details on the source code."), 
+                        " to find more details on the project."), 
                       hr()), 
              
              ## portfolio value ----------
@@ -183,7 +187,7 @@ ui <- fluidPage(
                         ### inputs -----
                         sidebarPanel(
                           width = 3, 
-                          h3("Stock monitoring"), 
+                          h3(strong("Stock monitoring")), 
                           br(), 
                           br(), 
                           selectInput("ticker", 
@@ -277,7 +281,7 @@ ui <- fluidPage(
                         ### inputs -----
                         sidebarPanel(
                           width = 3, 
-                          h3("Prediction & Time Series Analysis"),
+                          h3(strong("Prediction & Time Series Analysis")),
                           br(), 
                           br(),
                           dateInput(inputId = "pred_start_date",
@@ -343,7 +347,7 @@ ui <- fluidPage(
                sidebarLayout(
                  sidebarPanel(
                    width = 3, 
-                   h3("Financial data collection"),
+                   h3(strong("Financial data collection")),
                    br(), 
                    br(), 
                    selectInput("ticker_dat", 
@@ -476,12 +480,10 @@ server <- function(input, output) {
       })
       
       ### portfolio returns -----
-      weighted_ret <- assets_value %>%
-        filter(date >= input$start_date) %>%
-        compute_daily_returns() %>%
-        compute_weighted_returns(num_shares = num_shares) 
+      port_ret <- port_value %>%
+        compute_daily_returns(asset_dat = NULL)
       
-      port_cumret <- weighted_ret %>%
+      port_cumret <- port_ret %>%
         compute_cumulative_returns()
       
       ### data viz -----
@@ -497,11 +499,15 @@ server <- function(input, output) {
       
       ## portfolio composition ----------
       
-      ### best and worst -----
-      best_asset <- get_best_asset(assets_cumret = weighted_ret %>%
-                                     compute_cumulative_returns(all = F)) 
-      worst_asset <- get_worst_asset(assets_cumret = weighted_ret %>%
-                                       compute_cumulative_returns(all = F)) 
+      ### best and worst assets -----
+      assets_cumret <- assets_value %>%
+        filter(date >= input$start_date) %>%
+        compute_daily_returns() %>%
+        compute_weighted_returns(num_shares = num_shares) %>%
+        compute_cumulative_returns(all = F)
+      
+      best_asset <- get_best_asset(assets_cumret) 
+      worst_asset <- get_worst_asset(assets_cumret) 
       
       ### data viz -----
       output$portfolio_composition <- renderPlotly({
@@ -531,8 +537,7 @@ server <- function(input, output) {
         add_rsi()
       
       ### asset returns -----
-      daily_ret <- assets_value_list[[input$ticker]] %>%
-        filter(date >= input$buy_date) %>%
+      daily_ret <- prices %>%
         compute_daily_returns() 
       weighted_ret <- daily_ret %>%
         compute_weighted_returns(num_shares = num_shares)
@@ -653,9 +658,17 @@ server <- function(input, output) {
                  close, 
                  MA20:RSI)) 
       
-      output$data <- renderDataTable({ dat %>% arrange(desc(date)) })
-      output$ret_data <- renderDataTable({ ret_dat %>% arrange(desc(date)) })
-      output$indicators_data <- renderDataTable({ indicators_dat %>% arrange(desc(date)) })
+      output$data <- renderDataTable( { dat %>% arrange(desc(date)) }, 
+                                      options = list(pageLength = 10,
+                                                    lengthMenu = c(10, 25, 50, 100)) )
+      
+      output$ret_data <- renderDataTable( { ret_dat %>% arrange(desc(date)) }, 
+                                          options = list(pageLength = 10,
+                                                        lengthMenu = c(10, 25, 50, 100)) )
+      
+      output$indicators_data <- renderDataTable( { indicators_dat %>% arrange(desc(date)) }, 
+                                                 options = list(pageLength = 10,
+                                                               lengthMenu = c(10, 25, 50, 100)) )
       
       output$download <- downloadHandler(
         filename <- function() {

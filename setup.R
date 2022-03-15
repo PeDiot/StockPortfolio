@@ -117,7 +117,7 @@ clean_tq_data <- function(df){
              .keep_all = T) %>%
     mutate(ticker = na.locf(ticker), 
            close = na.locf(close)) %>%
-    complete(date = seq.Date(min(date), max(date), by="day")) %>%
+    complete(date = seq.Date(min(date), today(), by="day")) %>%
     fill(everything())
 }
 
@@ -218,9 +218,6 @@ get_portfolio_value <- function(assets_value){
   "Return portfolio value given assets' prices and number of shares."
   
   assets_value %>%
-    group_by(ticker) %>%
-    complete(date = seq.Date(min(date), max(date), by="day")) %>%
-    fill(value) %>%
     group_by(date) %>%
     summarise(value = sum(value))
   
@@ -255,31 +252,40 @@ get_current_price <- function(data){
 
 # ----- Assets performance -----
 
-compute_daily_returns <- function(assets_value){
+compute_daily_returns <- function(asset_dat, portfolio_dat = NULL){
   "Calculate the daily returns and for our assets."
   
-  if (assets_value %>%
-        pull(ticker) %>%
-        unique() %>%
-        length() == 1){
-    returns <- assets_value %>%
-      complete(date = seq.Date(min(date), max(date), by="day")) %>%
-      fill(c(ticker, close)) %>%
-      tq_mutate(select = close,
-                   mutate_fun = periodReturn,
-                   period = "daily",
-                   col_rename = "ret") %>%
-      select(c(ticker,
-               date, 
-               ret))
+  if ( !(is.null(asset_dat)) ){
+    n_tickers <- asset_dat %>% 
+      pull(ticker) %>%
+      unique() %>%
+      length()
+    if (n_tickers == 1){
+      returns <- asset_dat %>%
+        tq_mutate(select = close,
+                  mutate_fun = periodReturn,
+                  period = "daily",
+                  col_rename = "ret") %>%
+        select(c(ticker,
+                 date, 
+                 ret))
+    }
+    else{
+      returns <- asset_dat %>%
+        group_by(ticker) %>%
+        tq_mutate(select = close,
+                  mutate_fun = periodReturn,
+                  period = "daily",
+                  col_rename = "ret") %>%
+        select(c(ticker,
+                 date, 
+                 ret))
+    }
+    
   }
-  else{
-    returns <- assets_value %>%
-      group_by(ticker) %>%
-      complete(date = seq.Date(min(date), max(date), by="day")) %>%
-      fill(c(close, ticker)) %>%
-      group_by(ticker) %>%
-      tq_transmute(select = close,
+  if ( !(is.null(portfolio_dat)) ){
+    returns <- portfolio_dat %>%
+      tq_transmute(select = value,
                    mutate_fun = periodReturn,
                    period = "daily",
                    col_rename = "ret")
@@ -311,9 +317,7 @@ compute_cumulative_returns <- function(ret_data, all = T){
   
   if (all == T){
     cum_returns <- ret_data %>%
-      group_by(date) %>%
-      summarise(port_ret = sum(wt_return)) %>%
-      mutate(cr = cumprod(1 + port_ret)) 
+      mutate(cr = cumprod(1 + ret)) 
   }
   else{
     cum_returns <- ret_data %>%
