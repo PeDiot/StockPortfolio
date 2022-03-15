@@ -111,7 +111,12 @@ $$R = \Pi_{t=1}^T \ r_t = \Pi_{t=1}^{T-1} \text{ avec } r_t = \frac{p_{t+1} - p_
 
 #### Réseaux de neurones
 
-#### Combiner Python & R via `reticulate`
+#### Combiner Python & R 
+
+- Module python `stockPrediction` pour prédire à partir du modèle entrainé
+- Environnement virtuel via `reticulate` pour appeler le script `prediction.py` depuis R
+- Sauvegarde des valeurs prédites au format `.RData`
+- Difficulté à déployer sur shinyapps...
 
 --- 
 
