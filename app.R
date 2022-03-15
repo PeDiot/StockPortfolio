@@ -10,7 +10,7 @@ date_init <- today() - years(5)
 yf_data <- get_tq_data(tickers = tickers, 
                        start_date = date_init) 
 
-# save_data_list(df_list = yf_data)
+save_data_list(df_list = yf_data)
 
 # Predict new values for each stock --------------------------------------------------------------------
 
@@ -20,7 +20,7 @@ yf_data <- get_tq_data(tickers = tickers,
 
 ## Launch Python script -----
 
-# reticulate::py_run_file("stock_prediction.py")
+sreticulate::py_run_file("stock_prediction.py")
 
 ## Predictions -----
 
@@ -615,14 +615,14 @@ server <- function(input, output) {
       
       ### ACF/PACF -----
       output$acf <- renderPlotly({
-        ts <- daily_ret %>%
+        ts <- port_ret %>%
           pull(ret)
         ggplot_acf_pacf(res_= acf(ts, plot= F), 
                         n_lag = input$n_lag,
                         label= "ACF") 
       })
       output$pacf <- renderPlotly({
-        ts <- daily_ret %>%
+        ts <- port_ret %>%
           pull(ret)
         ggplot_acf_pacf(res_= acf(ts, plot= F), 
                         n_lag = input$n_lag,
