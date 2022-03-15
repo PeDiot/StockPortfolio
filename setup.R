@@ -13,6 +13,7 @@ macdHist <- "#B5CDD2"
 rsi <- "#F3B0DE"
 bbands <- "#CACED2"
 pctBB <- "#5EB6B1"
+pred <- "#A48BAB"
 
 # ----- GGplot theme -----
 
@@ -49,6 +50,9 @@ row.names = c("LVMH",
 
 tickers <- symbols %>% pull(tickers) 
 names(tickers) <- rownames(symbols)
+
+pred_input_choices <- c(tickers, "All")
+names(pred_input_choices) <- c(names(tickers), "All")
 
 # ----- Utils -----
 
@@ -427,6 +431,27 @@ add_predictions <- function(
   
 }
 
+
+compute_avg_pred <- function(pred_dat, ticker){
+  "Return average predicted value for 5 next days."
+  
+  if (ticker == "All"){
+    tmp <- pred_dat %>%
+      filter(date >= today()) %>%
+      pull(value)
+  }
+  else {
+    tmp <- pred_dat %>%
+      filter(date >= today()) %>%
+      pull(close)
+  }
+  tmp %>%
+    mean() %>%
+    round(2) %>%
+    format(big.mark = ",", 
+           decimal.mark = ".", 
+           scientific = F)
+}
 
 # ----- Financial indicators -----
 
@@ -1145,17 +1170,34 @@ ggplot_acf_pacf <- function(
   
 }
 
-plot_portfolio_predictions <- function(portfolio_value_pred, start_date){
+plot_predictions <- function(pred_dat, start_date, ticker){
   "Return a chart with observed and predicted values over last months."
   
-  portfolio_value_pred %>%
-    filter(date >= start_date) %>%
-    mutate(pred_value = ifelse(date >= today(), 
-                               value, 
-                               NA), 
-           value = ifelse(date >= today(), 
-                          NA, 
-                          value)) %>% 
+  if (ticker != "All"){
+    title <- get_indicator_plot_title(ticker = ticker, 
+                                      indicator_type = "5-day Stock Prediction")
+    pred_dat <- pred_dat %>%
+      filter(date >= start_date) %>%
+      mutate(pred_value = ifelse(date >= today() - days(1), 
+                                 close, 
+                                 NA), 
+             value = ifelse(date >= today(), 
+                            NA, 
+                            close)) 
+  }
+  else{
+    title <- "5-day Portfolio Value Prediction"
+    pred_dat <- pred_dat %>%
+      filter(date >= start_date) %>%
+      mutate(pred_value = ifelse(date >= today() - days(1), 
+                                 value, 
+                                 NA), 
+             value = ifelse(date >= today(), 
+                            NA, 
+                            value)) 
+  }
+  
+  pred_dat %>%
     plot_ly() %>%
     add_trace(type = "scatter", 
               mode = "lines",
@@ -1172,8 +1214,9 @@ plot_portfolio_predictions <- function(portfolio_value_pred, start_date){
               y = ~pred_value,
               name = "Predicted",
               line = list(width = 1.7, 
-                          color = medium)) %>%
-    plotly_layout(title = "5-day Portfolio Value Prediction", 
+                          color = pred, 
+                          dash = "dot")) %>%
+    plotly_layout(title = title, 
                   title.y = "Value ($)", 
                   range_selector = F) 
   
@@ -1218,6 +1261,30 @@ infoBox_last_value <- function(last_val){
           color = "purple", 
           icon = tags$i(class = "fas fa-money-check", 
                         style = "font-size: 20px"), 
+          fill = F)
+}
+
+infoBox_avg_pred <- function(avg_pred, ticker){
+  "Return infoBox for average predicted value."
+  
+  if (ticker == "All"){
+    title <- "Average predicted value"
+    value <- paste(avg_pred, "$")
+    color <- "purple"
+    icon <- tags$i(class = "fas fa-money-check", 
+                   style = "font-size: 20px")
+  }
+  else {
+    title <- "Average predicted price"
+    value <- avg_pred
+    color <- "light-blue"
+    icon <- tags$i(class = "fas fa-dollar-sign", 
+                   style = "font-size: 20px")
+  }
+  infoBox(title = title,
+          value = value, 
+          color = color, 
+          icon = icon, 
           fill = F)
 }
 
@@ -1279,36 +1346,6 @@ infoBox_asset_cumret <- function(asset, type = "best"){
           color = color, 
           fill = F)
   
-}
-
-infoBox_MA <- function(ma_val, ma_type){
-  "Return infoBox to display last moving average."
-  
-  if (is.na(ma_val)){
-    ma_val <- NA
-  }
-  else{
-    ma_val <- paste0(round(ma_val, 2), "$")
-  }
-  if (ma_type == "MA20"){
-    color <- "aqua"
-    title <- paste(ma_type, "(short)")
-  }
-  if (ma_type == "MA50"){
-    color <- "purple"
-    title <- paste(ma_type, "(medium)")
-  }
-  if (ma_type == "MA100"){
-    color = "black"
-    title <- paste(ma_type, "(long)")
-  }
-  
-  infoBox(title = title, 
-          value = ma_val,  
-          icon =  tags$i(class = "fas fa-chart-line", 
-                         style="font-size: 20px"), 
-          color = color, 
-          fill = F)
 }
 
 num_shares_input <- function(

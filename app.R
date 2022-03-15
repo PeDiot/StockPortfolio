@@ -10,7 +10,7 @@ date_init <- today() - years(5)
 yf_data <- get_tq_data(tickers = tickers, 
                        start_date = date_init) 
 
-save_data_list(df_list = yf_data)
+# save_data_list(df_list = yf_data)
 
 # Predict new values for each stock --------------------------------------------------------------------
 
@@ -20,7 +20,7 @@ save_data_list(df_list = yf_data)
 
 ## Launch Python script -----
 
-sreticulate::py_run_file("stock_prediction.py")
+# reticulate::py_run_file("stock_prediction.py")
 
 ## Predictions -----
 
@@ -283,56 +283,48 @@ ui <- fluidPage(
                           width = 3, 
                           h3(strong("Prediction & Time Series Analysis")),
                           br(), 
-                          br(),
+                          br(), 
+                          selectInput("ticker_pred", 
+                                      label = h4("Which asset?"), 
+                                      width = "200px", 
+                                      choices = pred_input_choices, 
+                                      selected = "All"),
+                          br(), 
+                          br(), 
+                          br(), 
+                          br(), 
+                          br(), 
+                          br(), 
                           dateInput(inputId = "pred_start_date",
                                     label = h4("How far back do you want to go?"),
                                     width = "200px",  
                                     value = today() - months(1),
                                     min = today() - months(3), 
                                     max = today(),
-                                    format = "yyyy-mm-dd"), 
-                          br(), 
-                          br(), 
-                          br(), 
-                          h4("How many lags for ACF/PACF?"), 
-                          numericInput("n_lag",
-                                       label = "",
-                                       min = 1,
-                                       max = 100,
-                                       value = 20, 
-                                       width = "100px")
+                                    format = "yyyy-mm-dd")
                         ), 
                         
                         ### predictions data viz -----
                         mainPanel(
-                          tabsetPanel(
-                            tabPanel("Overall value", 
-                                     br(), 
-                                     br(), 
-                                     br(), 
-                                     br(), 
-                                     br(), 
-                                     br(), 
-                                     div(plotlyOutput("portfolio_pred_plot", 
-                                                      height = 500, 
-                                                      width = 700), 
-                                         align = "center")),
-                            tabPanel("Auto-Correlation", 
-                                     br(),
-                                     h4("Auto-Correlation Function", 
-                                        align = "center"), 
-                                     div(plotlyOutput("acf", 
-                                                      height = 300, 
-                                                      width = 600), 
-                                         align = "center"),
-                                     br(), 
-                                     h4("Partial Auto-Correlation Function", 
-                                        align = "center"), 
-                                     div(plotlyOutput("pacf", 
-                                                      height = 300, 
-                                                      width = 600), 
-                                         align = "center")) 
-                          )
+                          br(), 
+                          br(), 
+                          br(),
+                          fluidRow(column(width = 4),
+                                   infoBoxOutput("avg_pred")),
+                          br(),
+                          br(), 
+                          br(), 
+                          br(), 
+                          div(plotlyOutput("portfolio_pred_plot",
+                                           height = 500, 
+                                           width = 700), 
+                              align = "center"), 
+                          br(), 
+                          br(), 
+                          p(strong("Note"), 
+                            ": the model used to predict the stock data is a neural networks implemented in Python with ", 
+                            a(href = "https://www.tensorflow.org/?hl=fr", "tensorflow"), 
+                            ". More information in the documentation.")
                         )
                       ) 
                       
@@ -432,6 +424,7 @@ server <- function(input, output) {
       input$start_date, 
       input$ticker,
       input$buy_date, 
+      input$ticker_pred, 
       input$pred_start_date, 
       input$ticker_dat, 
       input$dat_start_date, 
@@ -603,30 +596,31 @@ server <- function(input, output) {
                                         num_shares)
       final_assets_value <- add_predictions(observed_dat = assets_value_list, 
                                             predicted_dat = predictions, 
-                                            ticker = tickers)
+                                            ticker = tickers, 
+                                            merge = F)
       
-      ### portfolio predicted value ----
-      portfolio_value_pred <- get_portfolio_value(assets_value = final_assets_value)
+      ### predicted values ----
+      if (input$ticker_pred == "All"){
+        plot_dat <- get_portfolio_value(assets_value = final_assets_value %>%
+                                          bind_rows())
+      } 
+      else {
+        plot_dat <- final_assets_value[[input$ticker_pred]]
+      }
       
+      ### visualize predicitons ----
       output$portfolio_pred_plot <- renderPlotly({
-        plot_portfolio_predictions(portfolio_value_pred, 
-                                   start_date = input$pred_start_date) 
+        plot_predictions(plot_dat, 
+                         start_date = input$pred_start_date,
+                         ticker = input$ticker_pred) 
       })
       
-      ### ACF/PACF -----
-      output$acf <- renderPlotly({
-        ts <- port_ret %>%
-          pull(ret)
-        ggplot_acf_pacf(res_= acf(ts, plot= F), 
-                        n_lag = input$n_lag,
-                        label= "ACF") 
-      })
-      output$pacf <- renderPlotly({
-        ts <- port_ret %>%
-          pull(ret)
-        ggplot_acf_pacf(res_= acf(ts, plot= F), 
-                        n_lag = input$n_lag,
-                        label= "PACF") 
+      ### prediction infoBox -----
+      avg_pred <- compute_avg_pred(pred_dat = plot_dat, 
+                                   ticker = input$ticker_pred)
+      output$avg_pred <- renderInfoBox({
+        infoBox_avg_pred(avg_pred, 
+                         ticker = input$ticker_pred)
       })
       
       ## data -----
