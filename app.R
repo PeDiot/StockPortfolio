@@ -608,7 +608,7 @@ server <- function(input, output) {
         plot_dat <- final_assets_value[[input$ticker_pred]]
       }
       
-      ### visualize predicitons ----
+      ### visualize predictions ----
       output$portfolio_pred_plot <- renderPlotly({
         plot_predictions(plot_dat, 
                          start_date = input$pred_start_date,
