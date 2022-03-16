@@ -20,9 +20,9 @@ backgroundColor: #fff
 <br>
 - Proposer un outil **centralisé**, *user-friendly* et visuel
 <br>
-- Analyser la **performance** de chaque action via des indicateurs financiers 
+- Analyser la **performance** de chaque valeur via des indicateurs financiers 
 <br>
-- **Prédire** l'évolution du portefeuille sous 5 jours à l'aide d'un réseau de neurones
+- **Prédire** l'évolution du portefeuille sous 5 jours
 
 --- 
 
@@ -40,7 +40,7 @@ backgroundColor: #fff
 
 --- 
 
-# Fonctionnalités de l'app
+# Fonctionnalités de l'[app](https://pdiot.shinyapps.io/StockPortfolio/)
 
 <style>
 img[alt~="center"] {
@@ -64,7 +64,7 @@ $$MA_k = \frac{1}{k} \sum_{t = n - k + 1}^{T} p_t$$
 
 **Rendements cumulés** 
 
-$$R = \Pi_{t=1}^T \ r_t = \Pi_{t=1}^{T-1} \text{ avec } r_t = \frac{p_{t+1} - p_t}{p_t}$$
+$$R = \Pi_{t=1}^T \ r_t  \text{ avec } r_t = \frac{p_{t+1} - p_t}{p_t}$$
 
 
 ---
@@ -103,7 +103,7 @@ $$R = \Pi_{t=1}^T \ r_t = \Pi_{t=1}^{T-1} \text{ avec } r_t = \frac{p_{t+1} - p_
 <br>
 - Indicateur compris entre 0 et 100
 <br>
-- Identifier si la valeur est *trop achetée* (RSI > 70) ou *trop vendue* (RSI < 30)
+- Identifier si la valeur est *overbough* (RSI > 70) ou *oversold* (RSI < 30)
 
 ---
 
@@ -126,17 +126,21 @@ $$R = \Pi_{t=1}^T \ r_t = \Pi_{t=1}^{T-1} \text{ avec } r_t = \frac{p_{t+1} - p_
 
 - Outil d'**aide à la décision** simple à utiliser et épuré 
 <br>
-- Données mises à jour **quotidiennement** et sans stockage nécessaire (API)
+- Données mises à jour **quotidiennement** et sans stockage nécessaire (API Yahoo Finance)
 <br>
 - Diversité d'indicateurs
 <br>
-- Aller plus loin via la **prédiction** sous 5 jours
+- Utilisation du *deep learning* pour la **prédiction** à 5 jours
 
 --- 
 
 # Conclusion
 
+<br>
+
 #### Axes d'amélioration
+
+<br>
 
 - Laisser l'utilisateur choisir ses propres actions/cryptos 
 <br>
