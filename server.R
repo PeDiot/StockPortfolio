@@ -23,7 +23,7 @@ server <- function(input, output) {
       
 # home image --------------------------------------------------------------
       output$home_img <- renderImage({
-        list(src = "home_img.png", 
+        list(src = "./figs/home_img.png", 
              width = 350,
              height = 350)
         
