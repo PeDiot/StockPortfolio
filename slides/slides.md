@@ -53,6 +53,10 @@ img[alt~="center"] {
 
 ---
 
+![width:1000px center](prediction_demo.gif)
+
+---
+
 # Indicateurs financiers
 
 <br>
