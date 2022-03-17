@@ -77,7 +77,7 @@ $$R = \Pi_{t=1}^T \ r_t  \text{ avec } r_t = \frac{p_{t+1} - p_t}{p_t}$$
 
 <br>
 
-**Candletstick** : graphique affichant les prix d'ouverture (*open*), de fermeture (***close***), le plus haut (*high*) et le plus bas (*low*)
+**Candlestick** : graphique affichant les prix d'ouverture (*open*), de fermeture (***close***), le plus haut (*high*) et le plus bas (*low*)
 
 <br>
 
@@ -107,7 +107,7 @@ $$R = \Pi_{t=1}^T \ r_t  \text{ avec } r_t = \frac{p_{t+1} - p_t}{p_t}$$
 <br>
 - Indicateur compris entre 0 et 100
 <br>
-- Identifier si la valeur est *overbough* (RSI > 70) ou *oversold* (RSI < 30)
+- Identifier si la valeur est *overbought* (RSI > 70) ou *oversold* (RSI < 30)
 
 ---
 
