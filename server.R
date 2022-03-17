@@ -91,7 +91,7 @@ server <- function(input, output) {
       best_asset <- get_best_asset(assets_cumret) 
       worst_asset <- get_worst_asset(assets_cumret) 
       
-## data viz --------------------------------------------------------------
+### data viz --------------------------------------------------------------
       output$portfolio_composition <- renderPlotly({
         assets_value %>%
           filter(date >= input$start_date) %>%
@@ -159,7 +159,7 @@ server <- function(input, output) {
           candlestick_chart(ticker = input$ticker) 
       })
       
-### bollinger bands --------------------------------------------------------------
+## bollinger bands --------------------------------------------------------------
       bbands_dat <- calculate_bbands(price_data = prices)
       output$bbands_plot <- renderPlotly({
         bbands_chart(bbands_dat, input$ticker)
