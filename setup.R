@@ -21,38 +21,80 @@ theme_set(theme_minimal())
 
 # ----- Enter your assets -----
 
-symbols <- structure(list(
-  tickers = c("LVMUY",
-              "OR.PA", 
-              "AI.PA", 
-              "ORAN", 
-              "ECIFF",
-              "CRERF", 
-              "RNSDF", 
-              "UBSFF", 
-              "OVH.PA", 
-              "TFI.PA")
-),
-class = "data.frame", 
-row.names = c("LVMH",
-              "L'Oréal", 
-              "Air Liquide", 
-              "Orange", 
-              "EDF", 
-              "Carrefour", 
-              "Renault", 
-              "Ubisoft", 
-              "OVH Groupe", 
-              "TF1")
+stock_tickers <- c("LVMUY",
+                   "OR.PA", 
+                   "AI.PA", 
+                   "ORAN", 
+                   "ECIFF",
+                   "CRERF", 
+                   "RNSDF", 
+                   "UBSFF", 
+                   "OVH.PA", 
+                   "TFI.PA",
+                   "^FCHI", 
+                   "AAPL", 
+                   "MSFT", 
+                   "GOOGL", 
+                   "AMZN")
+stock_names <- c("LVMH",
+                 "L'Oréal", 
+                 "Air Liquide", 
+                 "Orange", 
+                 "EDF", 
+                 "Carrefour", 
+                 "Renault", 
+                 "Ubisoft", 
+                 "OVH Groupe", 
+                 "TF1", 
+                 "CAC40", 
+                 "Apple", 
+                 "Microsoft", 
+                 "Alphabet", 
+                 "Amazon")
+names(stock_tickers) <- stock_names
 
+crypto_tickers <- c("BTC-EUR", 
+                    "ETH-EUR", 
+                    "BNB-EUR", 
+                    "SOL-EUR", 
+                    "MATIC-EUR", 
+                    "MANA-EUR", 
+                    "DOGE-EUR")
+
+crypto_names <- c("Bitcoin", 
+                  "Ethereum", 
+                  "Binance Coin", 
+                  "Solana", 
+                  "Polygon (MATIC)", 
+                  "Decentraland (MANA)", 
+                  "Dogecoin")
+names(crypto_tickers) <- crypto_names
+
+symbols <- structure(list(
+  tickers = c(stock_tickers, crypto_tickers)
+),
+  class = "data.frame", 
+  row.names = c(stock_names, crypto_names)
 )
 
 
-tickers <- symbols %>% pull(tickers) 
-names(tickers) <- rownames(symbols)
+my_tickers <- c("LVMUY",
+             "OR.PA", 
+             "AI.PA", 
+             "ORAN", 
+             "ECIFF",
+             "CRERF", 
+             "RNSDF", 
+             "UBSFF", 
+             "OVH.PA", 
+             "TFI.PA")
+ 
+names(my_tickers) <- symbols %>%
+  filter(tickers %in% my_tickers) %>%
+  rownames()
 
-pred_input_choices <- c(tickers, "All")
-names(pred_input_choices) <- c(names(tickers), "All")
+pred_input_choices <- c(my_tickers, "All")
+names(pred_input_choices) <- c(names(my_tickers), "All")
 
 # ----- Utils -----
 
@@ -326,7 +368,7 @@ compute_cumulative_returns <- function(ret_data, all = T){
   else{
     cum_returns <- ret_data %>%
       group_by(ticker) %>%
-      mutate(cr = cumprod(1 + wt_return)) 
+      mutate(cr = cumprod(1 + ret)) 
   }
   
   return(cum_returns)
@@ -659,7 +701,7 @@ range_selector_period <- function(
   
 }
 
-plotly_legend <- function(x.pos = .5, y.pos = -.2, size = 12){
+plotly_legend <- function(x.pos = .5, y.pos = -.15, size = 12){
   list(orientation = "h", x = x.pos, y = y.pos,
        xanchor = "center", yref = "paper",
        font = list(size = 12),
@@ -678,7 +720,7 @@ plotly_layout <- function(
     p_layout <-p %>%
       layout(title = title,
              xaxis = list(rangeslider = list(visible = F), 
-                          rangeselector = range_selector_period(y_pos = -0.15),
+                          rangeselector = range_selector_period(y_pos = -0.1),
                           title = ""),
              yaxis = list(fixedrange = FALSE, 
                           title = title.y),
@@ -691,7 +733,7 @@ plotly_layout <- function(
                           title = ""),
              yaxis = list(fixedrange = FALSE, 
                           title = title.y),
-             legend = plotly_legend(y.pos = -.15)) 
+             legend = plotly_legend(y.pos = -.1)) 
   }
   return(p_layout)
     
@@ -763,7 +805,7 @@ plot_price_evolution <- function(
   plotly_obj, 
   title, 
   legend_group, 
-  trace_name = "Value ($)", 
+  trace_name = "Value (€)", 
   yaxis = NULL
 ){
   "Plot price evolution."
@@ -777,7 +819,7 @@ plot_price_evolution <- function(
                 y = ~value,
                 name = trace_name, 
                 line = list(color = evolution,
-                            width = 1.7), 
+                            width = 2), 
                 legendgroup = legend_group)
   }
   else{
@@ -816,11 +858,11 @@ plot_evolution <- function(price_dat, returns_dat){
            xaxis = list(rangeslider = list(visible = F), 
                         rangeselector = range_selector_period(y_pos = -0.15), 
                         title = ""),
-           yaxis = list(domain = c(0.55, 1),
+           yaxis = list(domain = c(0.45, 1),
                         fixedrange = FALSE,
                         tickfont = list(color = evolution), 
-                        title = "$"), 
-           yaxis2 = list(domain = c(0, 0.45),
+                        title = "€"), 
+           yaxis2 = list(domain = c(0, 0.35),
                          fixedrange = FALSE, 
                          tickfont = list(color = macd), 
                          title = ""), 
@@ -853,7 +895,7 @@ portfolio_composition <- function(assets_value){
             textinfo = "label+percent",
             insidetextfont = list(color = "black"),
             hoverinfo = "text",
-            text = ~paste0(asset, " ($", value %>%
+            text = ~paste0(asset, " (€", value %>%
                             round(2) %>%
                             format(big.mark = ",", 
                                    decimal.mark = ".", 
@@ -922,7 +964,7 @@ candlestick_chart <- function(ticker, price_data){
   title <- get_indicator_plot_title(ticker, 
                                     indicator_type = "Candlestick & Moving Averages")
   p <- p %>%
-    plotly_layout(title = title, title.y = "$")
+    plotly_layout(title = title, title.y = "€")
   
   return(p)
     
@@ -989,7 +1031,7 @@ bbands_chart <- function(bbands_dat, ticker){
            yaxis = list(domain = c(.40, 1),
                         fixedrange = FALSE,
                         tickfont = list(color = evolution), 
-                        title = "$"),
+                        title = "€"),
            yaxis2 = list(domain = c(0, .30),
                          fixedrange = FALSE,
                          tickfont = list(color = pctBB), 
@@ -1050,11 +1092,11 @@ macd_chart <- function(ticker, price_data){
          xaxis = list(rangeslider = list(visible = F), 
                       rangeselector = range_selector_period(y_pos = -0.15), 
                       title = ""),
-         yaxis = list(domain = c(0.55, 1),
+         yaxis = list(domain = c(0.45, 1),
                       fixedrange = FALSE,
                       tickfont = list(color = evolution), 
-                      title = "$"), 
-         yaxis2 = list(domain = c(0, 0.45),
+                      title = "€"), 
+         yaxis2 = list(domain = c(0, 0.35),
                        fixedrange = FALSE, 
                        tickfont = list(color = macd), 
                        title = "%"), 
@@ -1121,7 +1163,7 @@ rsi_chart <- function(ticker, price_data){
            yaxis = list(domain = c(0.45, 1),
                         fixedrange = FALSE,
                         tickfont = list(color = evolution), 
-                        title = "$"), 
+                        title = "€"), 
            yaxis2 = list(domain = c(0, 0.35),
                          fixedrange = FALSE, 
                          tickfont = list(color = rsi), 
@@ -1217,7 +1259,7 @@ plot_predictions <- function(pred_dat, start_date, ticker){
                           color = pred, 
                           dash = "dot")) %>%
     plotly_layout(title = title, 
-                  title.y = "Value ($)", 
+                  title.y = "Value (€)", 
                   range_selector = F) 
   
 }
@@ -1248,7 +1290,7 @@ infoBox_last_price <- function(last_price){
   infoBox(title = "Current price",
           value = last_price,
           color = "light-blue", 
-          icon = tags$i(class = "fas fa-dollar-sign", 
+          icon = tags$i(class = "fas fa-euro-sign", 
                         style = "font-size: 20px"), 
           fill = F)
 }
@@ -1257,7 +1299,7 @@ infoBox_last_value <- function(last_val){
   "Return infoBox for last value"
   
   infoBox(title = "Current value",
-          value = paste(last_val, "$"), 
+          value = paste(last_val, "€"), 
           color = "purple", 
           icon = tags$i(class = "fas fa-money-check", 
                         style = "font-size: 20px"), 
@@ -1269,7 +1311,7 @@ infoBox_avg_pred <- function(avg_pred, ticker){
   
   if (ticker == "All"){
     title <- "Average predicted value"
-    value <- paste(avg_pred, "$")
+    value <- paste(avg_pred, "€")
     color <- "purple"
     icon <- tags$i(class = "fas fa-money-check", 
                    style = "font-size: 20px")

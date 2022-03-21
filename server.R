@@ -1,5 +1,16 @@
 server <- function(input, output) {
   
+# home page --------------------------------------------------------------
+  
+## home image --------------------------------------------------------------
+  output$home_img <- renderImage({
+    list(src = "./figs/home_img.png", 
+         width = 300,
+         height = 300)
+    
+  }, deleteFile = F)
+  
+# observe events --------------------------------------------------------------
   observeEvent(
     c(input$num_shares_LVMUY,
       input$num_shares_OR.PA,
@@ -18,16 +29,8 @@ server <- function(input, output) {
       input$pred_start_date, 
       input$ticker_dat, 
       input$dat_start_date, 
-      input$checkbox_returns), 
+      input$checkbox_returns),
     {
-      
-# home image --------------------------------------------------------------
-      output$home_img <- renderImage({
-        list(src = "./figs/home_img.png", 
-             width = 350,
-             height = 350)
-        
-      }, deleteFile = F)
       
 # portfolio --------------------------------------------------------------
       
@@ -43,12 +46,12 @@ server <- function(input, output) {
                       input$num_shares_OVH.PA,
                       input$num_shares_TFI.PA)
       
-      names(num_shares) <- tickers
+      names(num_shares) <- my_tickers
       
       assets_value_list <- compute_assets_value(data = yf_data, 
                                                 num_shares = num_shares) 
       
-      assets_value <- assets_value_list %>%
+      assets_value <- assets_value_list[my_tickers] %>%
         bind_rows()
       
 ## portfolio value --------------------------------------------------------------
@@ -85,7 +88,6 @@ server <- function(input, output) {
       assets_cumret <- assets_value %>%
         filter(date >= input$start_date) %>%
         compute_daily_returns() %>%
-        compute_weighted_returns(num_shares = num_shares) %>%
         compute_cumulative_returns(all = F)
       
       best_asset <- get_best_asset(assets_cumret) 
@@ -121,9 +123,7 @@ server <- function(input, output) {
 ## asset returns --------------------------------------------------------------
       daily_ret <- prices %>%
         compute_daily_returns() 
-      weighted_ret <- daily_ret %>%
-        compute_weighted_returns(num_shares = num_shares)
-      asset_cumret <- weighted_ret %>%
+      asset_cumret <- daily_ret %>%
         compute_cumulative_returns(all = F)
       
 ## asset global evolution --------------------------------------------------------------
@@ -143,7 +143,13 @@ server <- function(input, output) {
       
 ## asset number of shares --------------------------------------------------------------
       output$asset_num_shares <- renderInfoBox({
-        infoBox_num_shares(num_shares = num_shares[input$ticker])
+        if (input$ticker %in% my_tickers){
+          num_shares <- num_shares[input$ticker]
+        }
+        else{
+          num_shares <- 0
+        }
+        infoBox_num_shares(num_shares)
       })
       
       
@@ -181,11 +187,11 @@ server <- function(input, output) {
       
 ## format data --------------------------------------------------------------
       predictions <- get_predicted_data(predictions, 
-                                        tickers,
+                                        my_tickers,
                                         num_shares)
-      final_assets_value <- add_predictions(observed_dat = assets_value_list, 
+      final_assets_value <- add_predictions(observed_dat = assets_value_list[my_tickers], 
                                             predicted_dat = predictions, 
-                                            ticker = tickers, 
+                                            ticker = my_tickers, 
                                             merge = F)
       
 ## predicted values --------------------------------------------------------------
@@ -222,16 +228,13 @@ server <- function(input, output) {
 ## returns --------------------------------------------------------------
       ret_dat <- dat %>%
         compute_daily_returns() %>%
-        compute_weighted_returns(num_shares = num_shares) %>%
         compute_cumulative_returns(all = F) %>%
         select(c(ticker, 
                  date, 
-                 ret, 
-                 wt_return, 
+                 ret,
                  cr)) %>%
-        rename(returns = ret, 
-               weighted_returns = wt_return, 
-               cumulative_returns = cr)
+        rename(`daily returns` = ret, 
+               `cumulative returns` = cr)
 
 ## indicators --------------------------------------------------------------      
       indicators_dat <- dat %>% 
