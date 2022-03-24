@@ -19,7 +19,7 @@ pred <- "#A48BAB"
 
 theme_set(theme_minimal())
 
-# ----- Enter your assets -----
+# ----- Assets -----
 
 stock_tickers <- c("LVMUY",
                    "OR.PA", 
@@ -79,15 +79,22 @@ symbols <- structure(list(
 
 
 my_tickers <- c("LVMUY",
-             "OR.PA", 
-             "AI.PA", 
-             "ORAN", 
-             "ECIFF",
-             "CRERF", 
-             "RNSDF", 
-             "UBSFF", 
-             "OVH.PA", 
-             "TFI.PA")
+                "OR.PA", 
+                "AI.PA", 
+                "ORAN", 
+                "ECIFF",
+                "CRERF", 
+                "RNSDF", 
+                "UBSFF", 
+                "OVH.PA", 
+                "TFI.PA")
+
+my_tickers_ix <- lapply(1:nrow(symbols), 
+                        function(ix){
+                          if (symbols[ix, "tickers"] %in% my_tickers){
+                            return(ix)
+                          }
+                        }) %>% unlist()
  
 names(my_tickers) <- symbols %>%
   filter(tickers %in% my_tickers) %>%
@@ -720,7 +727,7 @@ plotly_layout <- function(
     p_layout <-p %>%
       layout(title = title,
              xaxis = list(rangeslider = list(visible = F), 
-                          rangeselector = range_selector_period(y_pos = -0.1),
+                          rangeselector = range_selector_period(y_pos = -.1),
                           title = ""),
              yaxis = list(fixedrange = FALSE, 
                           title = title.y),
@@ -856,7 +863,7 @@ plot_evolution <- function(price_dat, returns_dat){
                             legend_group = "two") %>%
     layout(title = "",
            xaxis = list(rangeslider = list(visible = F), 
-                        rangeselector = range_selector_period(y_pos = -0.15), 
+                        rangeselector = range_selector_period(y_pos = -0.1), 
                         title = ""),
            yaxis = list(domain = c(0.45, 1),
                         fixedrange = FALSE,
@@ -1026,7 +1033,7 @@ bbands_chart <- function(bbands_dat, ticker){
   p %>%
     layout(title = title,
            xaxis = list(rangeslider = list(visible = F), 
-                        rangeselector = range_selector_period(y_pos = -0.15), 
+                        rangeselector = range_selector_period(y_pos = -0.1), 
                         title = ""),
            yaxis = list(domain = c(.40, 1),
                         fixedrange = FALSE,
@@ -1090,7 +1097,7 @@ macd_chart <- function(ticker, price_data){
   p <- p %>%
     layout(title = title,
          xaxis = list(rangeslider = list(visible = F), 
-                      rangeselector = range_selector_period(y_pos = -0.15), 
+                      rangeselector = range_selector_period(y_pos = -0.1), 
                       title = ""),
          yaxis = list(domain = c(0.45, 1),
                       fixedrange = FALSE,
@@ -1158,7 +1165,7 @@ rsi_chart <- function(ticker, price_data){
   p <- p %>%
     layout(title = title,
            xaxis = list(rangeslider = list(visible = F), 
-                        rangeselector = range_selector_period(y_pos = -0.15), 
+                        rangeselector = range_selector_period(y_pos = -0.1), 
                         title = ""),
            yaxis = list(domain = c(0.45, 1),
                         fixedrange = FALSE,
@@ -1342,7 +1349,7 @@ infoBox_num_shares <- function(num_shares){
 }
 
 
-infoBox_port_cumret <- function(last_cr){
+infoBox_last_cumret <- function(last_cr){
   "Return infoBox for current cumulative returns."
   
   if (last_cr < 0){
@@ -1372,12 +1379,12 @@ infoBox_asset_cumret <- function(asset, type = "best"){
                 paste("-", abs(asset$pct_cr)))
   
   if (type == "best"){
-    icon <- tags$i(class = "fas fa-arrow-up", 
+    icon <- tags$i(class = "fas fa-thumbs-up", 
                   style="font-size: 20px")
     color <- "green"
   }
   if (type == "worst"){
-    icon <- tags$i(class = "fas fa-arrow-down", 
+    icon <- tags$i(class = "fas fa-thumbs-down", 
                   style="font-size: 20px")
     color <- "red"
   }
@@ -1417,3 +1424,8 @@ num_shares_input <- function(
   )
 }
   
+picker_inputs_font_weight <- function(){
+  font_weights <- rep(x = "font-weight: plain;", nrow(symbols))
+  font_weights[my_tickers_ix] <- "font-weight: bold;"
+  return(font_weights)
+}

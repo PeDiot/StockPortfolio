@@ -158,7 +158,7 @@ ui <- fluidPage(
                       
                       sidebarLayout(
                         
-## inputs ---------------------------------------------------------
+                        ## inputs ---------------------------------------------------------
                         sidebarPanel(
                           width = 3, 
                           h3(strong("Stock monitoring")), 
@@ -169,7 +169,7 @@ ui <- fluidPage(
                                       width = "200px", 
                                       choices = list(Stocks = stock_tickers,
                                                      Cryptocurrencies = crypto_tickers), 
-                                      selected = "LVMH", 
+                                      choicesOpt = list(style = picker_inputs_font_weight()),
                                       multiple = F, 
                                       options = list(`live-search` = TRUE)),
                           br(), 
@@ -187,7 +187,7 @@ ui <- fluidPage(
                                     format = "yyyy-mm-dd")
                         ),
                         
-## financial data viz ---------------------------------------------------------
+                        ## financial data viz ---------------------------------------------------------
                         mainPanel( 
                           tabsetPanel(
                             tabPanel("Price & Returns", 
@@ -209,37 +209,54 @@ ui <- fluidPage(
                                      br(), 
                                      br(), 
                                      br(), 
-                                     br(), 
-                                     br(), 
                                      div(plotlyOutput("candlestick_plot", 
                                                       height = 600, 
                                                       width = 800), 
-                                         align = "center")),
+                                         align = "center"), 
+                                     br(), 
+                                     br(), 
+                                     p(icon(name = "book"), 
+                                       "  More information on candlestick charts can be found ", 
+                                       a(href = "https://www.investopedia.com/trading/candlestick-charting-what-is-it/", "here"), 
+                                       ".")),
                             tabPanel("Volatily",
                                      br(), 
-                                     br(), 
-                                     br(), 
+                                     br(),
                                      div(plotlyOutput("bbands_plot", 
-                                                      height = 700, 
+                                                      height = 680, 
                                                       width = 800), 
-                                         align = "center")),
+                                         align = "center"), 
+                                     br(), 
+                                     p(icon(name = "book"), 
+                                       "  More information on Bollinger bands can be found ", 
+                                       a(href = "https://www.investopedia.com/terms/b/bollingerbands.asp", "here"), 
+                                       ".")),
                             
                             tabPanel("MACD",
                                      br(), 
                                      br(), 
-                                     br(), 
                                      div(plotlyOutput("macd_plot", 
-                                                      height = 700, 
+                                                      height = 680, 
                                                       width = 800), 
-                                         align = "center")), 
+                                         align = "center"),
+                                     br(), 
+                                     p(icon(name = "book"), 
+                                       "  More information on the MACD indicator can be found ", 
+                                       a(href = "https://www.investopedia.com/terms/m/macd.asp", "here"), 
+                                       ".")),
                             tabPanel("RSI",
                                      br(), 
                                      br(), 
-                                     br(), 
                                      div(plotlyOutput("rsi_plot", 
-                                                      height = 700, 
+                                                      height = 680, 
                                                       width = 800), 
-                                         align = "center"))
+                                         align = "center"),
+                                     br(), 
+                                     p(icon(name = "book"), 
+                                       "  More information on the RSI indicator can be found ", 
+                                       a(href = "https://www.investopedia.com/terms/r/rsi.asp", "here"), 
+                                       ".")),
+                            
                           )
                         )
                         
@@ -284,16 +301,13 @@ ui <- fluidPage(
                          mainPanel(
                            br(), 
                            br(), 
-                           br(),
                            fluidRow(column(width = 4),
                                     infoBoxOutput("avg_pred")),
                            br(),
                            br(), 
-                           br(), 
-                           br(), 
                            div(plotlyOutput("portfolio_pred_plot",
-                                            height = 550, 
-                                            width = 750), 
+                                            height = 450, 
+                                            width = 700), 
                                align = "center"), 
                            br(), 
                            br(), 
@@ -323,7 +337,7 @@ ui <- fluidPage(
                                width = "200px", 
                                choices = list(Stocks = stock_tickers,
                                               Cryptocurrencies = crypto_tickers), 
-                               selected = "LVMH", 
+                               choicesOpt = list(style = picker_inputs_font_weight()),
                                multiple = F, 
                                options = list(`live-search` = TRUE)),
                    br(), 
@@ -368,18 +382,7 @@ ui <- fluidPage(
                  
                )
                
-             ), 
-             
-# documentation ---------------------------------------------------------
-             navbarMenu(
-               "Documentation", 
-               icon = icon("book"), 
-               
-               tabPanel("Financial Analysis"), 
-               tabPanel("Neural Networks")
-               
              )
-             
              
   )
   

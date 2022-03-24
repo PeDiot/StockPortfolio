@@ -79,7 +79,7 @@ server <- function(input, output) {
       
       output$port_last_cumret <- renderInfoBox({
         last_cumret <- get_current_cumret(port_cumret)
-        infoBox_port_cumret(last_cumret)
+        infoBox_last_cumret(last_cumret)
       })
       
 ## portfolio composition --------------------------------------------------------------
@@ -156,7 +156,7 @@ server <- function(input, output) {
 ## asset last cumulative returns --------------------------------------------------------------
       output$asset_last_cumret <- renderInfoBox({
         last_cumret <- get_current_cumret(asset_cumret)
-        infoBox_port_cumret(last_cumret)
+        infoBox_last_cumret(last_cumret)
       })
       
 ## candlestick with MAs --------------------------------------------------------------

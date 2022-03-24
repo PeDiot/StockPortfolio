@@ -1,6 +1,7 @@
 library(writexl)
 
 library(tidyverse)
+library(dplyr)
 library(data.table)
 library(plyr)
 library(stringr)

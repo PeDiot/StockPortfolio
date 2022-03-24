@@ -15,14 +15,10 @@ yf_data <- get_tq_data(tickers = symbols %>%
 
 # Predict new values for each stock --------------------------------------------------------------------
 
-## Virtual environment --------------------------------------------------------------------
-
-# source("virtualenv.R", encoding = "UTF-8")
-
 ## Launch Python script --------------------------------------------------------------------
 
 # reticulate::py_run_file("stock_prediction.py")
 
-## Predictions --------------------------------------------------------------------
+## Load predictions --------------------------------------------------------------------
 
 load(file = "./backup/stock_predictions.RData") 
