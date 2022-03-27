@@ -4,7 +4,7 @@ server <- function(input, output) {
   
 ## home image --------------------------------------------------------------
   output$home_img <- renderImage({
-    list(src = "./figs/home_img.png", 
+    list(src = "home_img.png", 
          width = 300,
          height = 300)
     
@@ -12,17 +12,14 @@ server <- function(input, output) {
   
 # observe events --------------------------------------------------------------
   observeEvent(
-    c(input$num_shares_LVMUY,
-      input$num_shares_OR.PA,
-      input$num_shares_AI.PA,
-      input$num_shares_ORAN,
-      input$num_shares_ECIFF,
-      input$num_shares_CRERF,
-      input$num_shares_RNSDF,
-      input$num_shares_UBSFF,
-      input$num_shares_OVH.PA,
-      input$num_shares_TFI.PA, 
-      input$start_date, 
+    c(input$`num_shares_BTC-EUR`,
+      input$`num_shares_ETH-EUR`,
+      input$`num_shares_MATIC-EUR`,
+      input$`num_shares_MANA-EUR`,
+      input$`buying_date_BTC-EUR`,
+      input$`buying_date_ETH-EUR`,
+      input$`buying_date_MATIC-EUR`,
+      input$`buying_date_MANA-EUR`,
       input$ticker,
       input$buy_date, 
       input$ticker_pred, 
@@ -35,28 +32,29 @@ server <- function(input, output) {
 # portfolio --------------------------------------------------------------
       
 ## inputs --------------------------------------------------------------
-      num_shares <- c(input$num_shares_LVMUY,
-                      input$num_shares_OR.PA,
-                      input$num_shares_AI.PA,
-                      input$num_shares_ORAN,
-                      input$num_shares_ECIFF,
-                      input$num_shares_CRERF,
-                      input$num_shares_RNSDF,
-                      input$num_shares_UBSFF,
-                      input$num_shares_OVH.PA,
-                      input$num_shares_TFI.PA)
-      
+      num_shares <- c(input$`num_shares_BTC-EUR`,
+                      input$`num_shares_ETH-EUR`,
+                      input$`num_shares_MATIC-EUR`,
+                      input$`num_shares_MANA-EUR`)
       names(num_shares) <- my_tickers
+      
+      buying_dates <- c(input$`buying_date_BTC-EUR`,
+                        input$`buying_date_ETH-EUR`,
+                        input$`buying_date_MATIC-EUR`,
+                        input$`buying_date_MANA-EUR`)
+      names(buying_dates) <- my_tickers
       
       assets_value_list <- compute_assets_value(data = yf_data, 
                                                 num_shares = num_shares) 
       
-      assets_value <- assets_value_list[my_tickers] %>%
+      my_assets_value <- my_tickers %>%
+        lapply(FUN = query_assets_since_buying_date, 
+               assets_dat = assets_value_list[my_tickers],
+               buying_dates = buying_dates) %>%
         bind_rows()
       
 ## portfolio value --------------------------------------------------------------
-      port_value <- get_portfolio_value(assets_value %>%
-                                          filter(date >= input$start_date))
+      port_value <- get_portfolio_value(my_assets_value)
       
       output$port_last_val <- renderInfoBox({
         val <- get_current_value(data = port_value) 
@@ -65,18 +63,20 @@ server <- function(input, output) {
       })
       
 ### portfolio returns --------------------------------------------------------------
-      port_ret <- port_value %>%
-        compute_daily_returns(asset_dat = NULL)
-      
-      port_cumret <- port_ret %>%
+      date_selection <- buying_dates[buying_dates != min(buying_dates)]
+      port_daily_ret <- port_value %>%
+        compute_daily_returns(asset_dat = NULL) %>%
+        filter( !(date %in% date_selection) )
+      port_cumret <- port_daily_ret %>%
         compute_cumulative_returns()
       
 ### data viz --------------------------------------------------------------
       output$portfolio_evolution <- renderPlotly({
         plot_evolution(price_dat = port_value, 
-                       returns_dat = port_cumret) 
+                       cum_ret_dat = port_cumret) 
       })
       
+      max_date <- max(buying_dates)
       output$port_last_cumret <- renderInfoBox({
         last_cumret <- get_current_cumret(port_cumret)
         infoBox_last_cumret(last_cumret)
@@ -85,8 +85,7 @@ server <- function(input, output) {
 ## portfolio composition --------------------------------------------------------------
       
 ### best and worst assets --------------------------------------------------------------
-      assets_cumret <- assets_value %>%
-        filter(date >= input$start_date) %>%
+      assets_cumret <- my_assets_value %>%
         compute_daily_returns() %>%
         compute_cumulative_returns(all = F)
       
@@ -95,8 +94,7 @@ server <- function(input, output) {
       
 ### data viz --------------------------------------------------------------
       output$portfolio_composition <- renderPlotly({
-        assets_value %>%
-          filter(date >= input$start_date) %>%
+        my_assets_value %>%
           portfolio_composition()
       })
       
@@ -107,6 +105,17 @@ server <- function(input, output) {
       output$worst_asset_cumret <- renderInfoBox({
         infoBox_asset_cumret(worst_asset, type = "worst")
       })
+      
+## portfolio data table --------------------------------------------------------------
+      port_dat <- merge(x = port_value, 
+                        y = port_cumret, 
+                        by = "date") %>%
+        arrange(desc(date)) %>%
+        rename(`daily returns` = ret, 
+               `cumulative returns` = cr)
+      output$port_data <- renderDataTable({port_dat}, 
+      options = list(pageLength = 10,
+                     lengthMenu = c(10, 25, 50, 100)) )
       
       
 # financial indicators per asset --------------------------------------------------------------
@@ -129,9 +138,9 @@ server <- function(input, output) {
 ## asset global evolution --------------------------------------------------------------
       output$asset_evolution <- renderPlotly({
         plot_evolution(price_dat = prices %>%
-                         dplyr::select( c(date, close) ) %>%
+                         dplyr::select(c(date, close)) %>%
                          rename(value = close), 
-                       returns_dat = asset_cumret)
+                       cum_ret_dat = asset_cumret)
       })
       
 ## asset last price --------------------------------------------------------------
@@ -181,41 +190,6 @@ server <- function(input, output) {
       output$rsi_plot <- renderPlotly({
         prices %>%
           rsi_chart(ticker = input$ticker) 
-      })
-      
-# predictions --------------------------------------------------------------
-      
-## format data --------------------------------------------------------------
-      predictions <- get_predicted_data(predictions, 
-                                        my_tickers,
-                                        num_shares)
-      final_assets_value <- add_predictions(observed_dat = assets_value_list[my_tickers], 
-                                            predicted_dat = predictions, 
-                                            ticker = my_tickers, 
-                                            merge = F)
-      
-## predicted values --------------------------------------------------------------
-      if (input$ticker_pred == "All"){
-        plot_dat <- get_portfolio_value(assets_value = final_assets_value %>%
-                                          bind_rows())
-      } 
-      else {
-        plot_dat <- final_assets_value[[input$ticker_pred]]
-      }
-      
-## visualize predictions --------------------------------------------------------------
-      output$portfolio_pred_plot <- renderPlotly({
-        plot_predictions(plot_dat, 
-                         start_date = input$pred_start_date,
-                         ticker = input$ticker_pred) 
-      })
-      
-## prediction infoBox --------------------------------------------------------------
-      avg_pred <- compute_avg_pred(pred_dat = plot_dat, 
-                                   ticker = input$ticker_pred)
-      output$avg_pred <- renderInfoBox({
-        infoBox_avg_pred(avg_pred, 
-                         ticker = input$ticker_pred)
       })
       
 # data --------------------------------------------------------------
