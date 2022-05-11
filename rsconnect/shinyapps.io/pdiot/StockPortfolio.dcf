@@ -1,0 +1,14 @@
+name: StockPortfolio
+title: StockPortfolio
+username:
+account: pdiot
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 5817205
+bundleId: 5894142
+url: https://pdiot.shinyapps.io/StockPortfolio/
+when: 1652257018.72436
+lastSyncTime: 1652257018.72436
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .RData|desktop.ini
