@@ -1,6 +1,17 @@
+# Setup -------------------------------------------------------
+
 options(warn = -1)
 
-# ----- Colors -----
+## Credentials -------------------------------------------------------
+credentials <- data.frame(
+  user = c("zeujahh"),
+  password = c("1995poSSe*"),
+  admin = TRUE,
+  comment = "Simple and secure authentification mechanism for single ‘Shiny’ applications.",
+  stringsAsFactors = FALSE
+)
+
+## Colors -------------------------------------------------------
 
 evolution <- "#709ABE"
 high <- "Forest Green"
@@ -15,31 +26,38 @@ bbands <- "#CACED2"
 pctBB <- "#5EB6B1"
 pred <- "#A48BAB"
 
-# ----- GGplot theme -----
+## GGplot theme -------------------------------------------------------
 
 theme_set(theme_minimal())
 
-# ----- Assets -----
+## Assets -------------------------------------------------------
 
-stock_tickers <- c("LVMUY",
+stock_tickers <- c("1QZ.F", 
+                   "MC.PA",
                    "OR.PA", 
                    "AI.PA", 
-                   "ORAN", 
-                   "ECIFF",
-                   "CRERF", 
-                   "RNSDF", 
-                   "UBSFF", 
+                   "ORA.PA", 
+                   "EDF.PA",
+                   "CA.PA", 
+                   "RNO.PA", 
+                   "UEN.F", 
                    "OVH.PA", 
                    "TFI.PA",
-                   "^FCHI", 
-                   "AAPL", 
-                   "MSFT", 
-                   "GOOGL", 
-                   "AMZN", 
+                   "APC.F", 
+                   "MSF.F", 
+                   "ABEC.F", 
+                   "AMZ.F", 
                    "ALUVI.PA", 
                    "COX.PA", 
-                   "NAVYA.PA")
-stock_names <- c("LVMH",
+                   "NAVYA.PA", 
+                   "BRK-B", 
+                   "KER.PA", 
+                   "RMS.PA", 
+                   "B1C.F", 
+                   "NNND.F", 
+                   "FB2A.F")
+stock_names <- c("Coinbase", 
+                 "LVMH",
                  "L'Oréal", 
                  "Air Liquide", 
                  "Orange", 
@@ -49,14 +67,19 @@ stock_names <- c("LVMH",
                  "Ubisoft", 
                  "OVH Groupe", 
                  "TF1", 
-                 "CAC40", 
                  "Apple", 
                  "Microsoft", 
                  "Alphabet", 
                  "Amazon", 
                  "UV Germi", 
                  "Nicox", 
-                 "Navya")
+                 "Navya", 
+                 "Berkshire Hathaway", 
+                 "Kering", 
+                 "Hermès", 
+                 "Baidu", 
+                 "Tencent", 
+                 "Meta Platforms")
 names(stock_tickers) <- stock_names
 
 crypto_tickers <- c("BTC-EUR", 
@@ -69,7 +92,11 @@ crypto_tickers <- c("BTC-EUR",
                     "BAT-EUR", 
                     "REP-EUR", 
                     "SC-EUR", 
-                    "DOT-EUR")
+                    "DOT-EUR",
+                    "XRP-EUR",
+                    "LTC-EUR", 
+                    "USDT-EUR", 
+                    "USDC-EUR")
 
 crypto_names <- c("Bitcoin", 
                   "Ethereum", 
@@ -81,23 +108,29 @@ crypto_names <- c("Bitcoin",
                   "Basic Attention Token", 
                   "Augur", 
                   "Siacoin", 
-                  "Polkadot")
+                  "Polkadot", 
+                  "Ripple", 
+                  "Litecoin",
+                  "Tether", 
+                  "USDC")
 names(crypto_tickers) <- crypto_names
 
 etf_tickers <- c("^FCHI", 
-                 "^GSPC")
+                 "^GSPC", 
+                 "E5T.F")
 etf_names <- c("CAC40", 
-               "S&P 500")
+               "S&P 500", 
+               "EUROTECH")
 names(etf_tickers) <- etf_names
 
 symbols <- structure(list(
-  tickers = c(stock_tickers, 
-              crypto_tickers, 
+  tickers = c(crypto_tickers, 
+              stock_tickers, 
               etf_tickers)
 ),
   class = "data.frame", 
-  row.names = c(stock_names, 
-                crypto_names, 
+  row.names = c(crypto_names, 
+                stock_names, 
                 etf_names)
 )
 
@@ -105,7 +138,9 @@ symbols <- structure(list(
 my_tickers <- c("BTC-EUR", 
                 "ETH-EUR", 
                 "MATIC-EUR", 
-                "MANA-EUR")
+                "MANA-EUR", 
+                "1QZ.F", 
+                "AMZ.F")
 
 my_tickers_ix <- lapply(1:nrow(symbols), 
                         function(ix){
@@ -114,14 +149,10 @@ my_tickers_ix <- lapply(1:nrow(symbols),
                           }
                         }) %>% unlist()
 
-names(my_tickers) <- symbols %>%
-  filter(tickers %in% my_tickers) %>%
-  rownames()
+names(my_tickers) <- symbols[my_tickers_ix, ] %>%
+  names()
 
-pred_input_choices <- c(my_tickers, "All")
-names(pred_input_choices) <- c(names(my_tickers), "All")
-
-# ----- Utils -----
+# Utils -------------------------------------------------------
 
 save_data_list <- function(df_list){
   "Save list of dataframes."
@@ -276,7 +307,7 @@ cumret_to_percent <- function(cr){
   
 }
 
-# ----- Value -----
+# Value -------------------------------------------------------
 
 compute_assets_value <- function(data, num_shares){
   "Return assets' value given prices and number of shares."
@@ -335,7 +366,12 @@ get_current_price <- function(data){
 }
 
 
-# ----- Assets performance -----
+# Assets performance -------------------------------------------------------
+
+calculate_total_returns <- function(p0, p1){
+  r <- (p1 - p0) / p0
+  return(r)
+}
 
 compute_daily_returns <- function(asset_dat, portfolio_dat = NULL){
   "Calculate the daily returns and for our assets."
@@ -451,90 +487,7 @@ get_worst_asset <- function(assets_cumret){
   
 }
 
-# ----- Predictions -----
-
-get_predicted_data <- function(
-  predictions,
-  tickers, 
-  num_shares
-){
-  "Return a list of predicted data frames."
-  
-  d <- predictions %>%
-    pivot_longer(cols = -date, 
-                 values_to = "close", 
-                 names_to = "ticker") %>%
-    data.frame() %>%
-    mutate(close = as.numeric(close)) 
-  
-  res <- lapply(tickers, 
-                function(ticker){
-                  tmp <- d[d$ticker == ticker, ]
-                  rownames(tmp) <- 1:5 
-                  n_shares <- rep(num_shares[ticker], 5) 
-                  tmp %>%
-                    mutate(n_shares = n_shares) %>%
-                    mutate(value = n_shares * close) %>%
-                    relocate(ticker, .before = date)
-                }) 
-  names(res) <- tickers
-  return(res) 
-  
-}
-
-add_predictions <- function(
-  observed_dat,
-  predicted_dat, 
-  tickers, 
-  merge = T
-){
-  "Add predictions to observed price data."
-  
-  res <- lapply(tickers, 
-                function(ticker){
-                  obs <- observed_dat[[ticker]] %>%
-                    select(c(ticker, 
-                             date, 
-                             close, 
-                             n_shares, 
-                             value))
-                  preds <- predicted_dat[[ticker]]
-                  rbind(obs, preds)
-                })
-  names(res) <- tickers
-  
-  if (merge == T){
-    res <- res %>%
-      bind_rows()
-  }
-  
-  return(res)
-  
-}
-
-
-compute_avg_pred <- function(pred_dat, ticker){
-  "Return average predicted value for 5 next days."
-  
-  if (ticker == "All"){
-    tmp <- pred_dat %>%
-      filter(date >= today()) %>%
-      pull(value)
-  }
-  else {
-    tmp <- pred_dat %>%
-      filter(date >= today()) %>%
-      pull(close)
-  }
-  tmp %>%
-    mean() %>%
-    round(2) %>%
-    format(big.mark = ",", 
-           decimal.mark = ".", 
-           scientific = F)
-}
-
-# ----- Financial indicators -----
+# Financial indicators -------------------------------------------------------
 
 add_moving_avg <- function(
   price_data,
@@ -620,25 +573,37 @@ add_macd <- function(
 ){
   "Return MACD and signal values for given period and prices."
   
-  if (percent == T){
-    macd_ <- MACD(x = price_data %>% pull(close), 
-                  nFast = ema_short, 
-                  nSlow = ema_long, 
-                  nSig = signal, 
-                  percent = T)
-  }
-  else{
-    macd_ <- MACD(x = price_data %>% pull(close), 
-                  nFast = ema_short, 
-                  nSlow = ema_long, 
-                  nSig = signal, 
-                  percent = F)
+  days_diff <- today() - min(price_data %>%
+                               pull(date))
+  
+  if (days_diff < ema_long){
+    price_data <- price_data %>%
+      mutate( MACD = rep(NA, nrow(.)) ) 
   }
   
-  price_data %>%
-    mutate(MACD = macd_[, 1], 
-           MACDSignal = macd_[, 2], 
-           MACDHist = MACD - MACDSignal)
+  else{
+    if (percent == T){
+      macd_ <- MACD(x = price_data %>% pull(close), 
+                    nFast = ema_short, 
+                    nSlow = ema_long, 
+                    nSig = signal, 
+                    percent = T)
+    }
+    else{
+      macd_ <- MACD(x = price_data %>% pull(close), 
+                    nFast = ema_short, 
+                    nSlow = ema_long, 
+                    nSig = signal, 
+                    percent = F)
+    }
+    price_data <- price_data %>%
+      mutate(MACD = macd_[, 1], 
+             MACDSignal = macd_[, 2], 
+             MACDHist = MACD - MACDSignal)
+    
+  }
+  
+  return(price_data)
   
 }
 
@@ -650,11 +615,11 @@ get_macd_signals <- function(price_data){
     price_data %>%
       mutate(
         MACDBuy = case_when(
-          MACD > Signal & lag(MACD) < lag(Signal) ~ 1, 
+          MACDHist > 0 & lag(MACDHist) < 0 ~ 1, 
           TRUE ~ 0
         ), 
         MACDSell = case_when(
-          MACD < Signal & lag(MACD) > lag(Signal) ~ 1, 
+          MACDHist < 0 & lag(MACDHist) > 0 ~ 1, 
           TRUE ~ 0
         )
       )
@@ -673,43 +638,69 @@ add_rsi <- function(
 ){
   "Compute Relative Strength Index (RSI) for given period and prices."
   
-  price_data %>%
-    mutate(RSI = RSI(price = close, 
-                     n = 14, 
-                     maType = ma_type))
+  days_diff <- today() - min(price_data %>%
+                               pull(date))
+  
+  if (days_diff < rsi_period){
+    price_data <- price_data %>%
+      mutate( RSI = rep(NA, nrow(.)) ) 
+  }
+  
+  else{
+    price_data <- price_data %>%
+      mutate(RSI = RSI(price = close, 
+                       n = 14, 
+                       maType = ma_type))
+  }
+
+  return(price_data)
   
 }
 
 get_rsi_signals <- function(
   price_data,
   lower_thresold = 30, 
-  upper_thresold = 70
+  upper_thresold = 70, 
+  ma_window = 100
 ){
-  "Identify buying and selling signals from RSI."
+  "Identify buying and selling signals from RSI for days where closing price > MAlong."
   
-  if ("RSI" %in% colnames(price_data)){
-    price_data %>%
-      mutate(
-        BuyRSI = case_when(
-          RSI < lower_thresold ~ 1, 
-          TRUE ~ 0
-        ), 
-        SellRSI = case_when(
-          RSI > upper_thresold ~ 1, 
-          TRUE ~ 0
+  start_date <- price_data %>% 
+    pull(date) %>%
+    min()
+  
+  if ( (today() - start_date) > ma_window ) {
+    
+    if ("RSI" %in% colnames(price_data)){
+        price_data %>%
+        add_moving_avg(window = 100) %>% 
+        filter(close >= MA100) %>% 
+        mutate(
+          RSIBuy = case_when(
+            RSI < lower_thresold ~ 1, 
+            TRUE ~ 0
+          ), 
+          RSISell = case_when(
+            RSI > upper_thresold ~ 1, 
+            TRUE ~ 0
+          )
         )
-      )
+    }
+    
+    else{
+      stop("You need to calculate RSI.")
+    }
+    
   }
+  
   else{
-    stop("You need to calculate RSI.")
+    stop(paste("You need more than", ma_window, "days."))
   }
   
 }
 
 
-# ----- Data Viz -----
-
-# --- Plotly settings
+# Data Viz -------------------------------------------------------
 
 range_selector_period <- function(
   x_pos = .5, 
@@ -779,8 +770,6 @@ plotly_layout <- function(
 }
 
 
-# --- Performance
-
 plot_daily_returns <- function(
   plotly_obj, 
   trace_col, 
@@ -843,37 +832,15 @@ plot_daily_returns <- function(
 
 plot_cumulative_returns <- function(
   plotly_obj, 
-  trace_col, 
-  title, 
+  multiple = F, 
+  title = "", 
+  trace_col = evolution, 
   legend_group,
   yaxis = NULL
 ){
   "Plot cumulative returns evolution."
-  
-  if (is.null(yaxis)){
-    p <- plotly_obj %>%
-      add_trace(type = "scatter", 
-                mode = "lines",
-                marker = NULL,
-                x = ~date,
-                y = cr,
-                name = "Cumulative returns", 
-                yaxis = yaxis, 
-                line = list(width = 1.7, 
-                            color = trace_col,
-                            dash = "dot"), 
-                legendgroup = legend_group) %>%
-      add_trace(type = "scatter", 
-                mode = "lines",
-                marker = NULL,
-                x = c(~min(date), ~max(date)),
-                y = c(1, 1), 
-                yaxis = yaxis, 
-                line = list(color = "black",
-                            width = 2), 
-                showlegend = F)
-  }
-  else{
+
+  if (multiple == F){
     p <- plotly_obj %>%
       add_trace(type = "scatter", 
                 mode = "lines",
@@ -885,17 +852,38 @@ plot_cumulative_returns <- function(
                 line = list(width = 1.7, 
                             color = trace_col,
                             dash = "dot"), 
-                legendgroup = legend_group) %>%
+                legendgroup = legend_group)
+  }
+  else{
+    p <- plotly_obj %>%
       add_trace(type = "scatter", 
                 mode = "lines",
                 marker = NULL,
-                x = c(~min(date), ~max(date)),
-                y = c(1, 1), 
+                x = ~date,
+                y = ~cr,
+                group = ~ticker,
+                color = ~ticker, 
+                name = ~ticker, 
                 yaxis = yaxis, 
-                line = list(color = "black",
-                            width = 2), 
-                showlegend = F)
+                line = list(width = 1.7,
+                            dash = "dot"), 
+                legendgroup = legend_group)
   }
+   
+  p <- p %>%
+    add_trace(type = "scatter", 
+              mode = "lines",
+              marker = NULL,
+              x = c(~min(date), ~max(date)),
+              y = c(1, 1), 
+              yaxis = yaxis, 
+              line = list(color = "black",
+                          width = 2), 
+              showlegend = F) %>%
+    layout(title = title,
+           xaxis = list(title = ""),
+           yaxis = list(title = ""), 
+           legend = plotly_legend())
   
   return(p)
   
@@ -1322,89 +1310,223 @@ ic_alpha <- function(alpha, acf_res){
   
 }
 
-ggplot_acf_pacf <- function(
-  res_,
-  n_lag,
-  label,
-  alpha= 0.05
+
+# Stock Recommender -------------------------------------------------------
+
+## Compute all indicators --------------------------------------------------------------
+
+add_indicators <- function(
+  price_dat, 
+  start_date, 
+  ema_short = 12, 
+  ema_long = 26, 
+  macd_signal = 9, 
+  rsi_period = 10
 ){
+  "Add MACD, RSI and signals to price data."
   
-  df_ <- with(res_, 
-              data.frame(lag, acf)) %>%
-    filter(lag <= n_lag)
-  
-  lim1 <-  ic_alpha(alpha, res_) ; lim0 <- -lim1
-  
-  p <- ggplot(data = df_, 
-              mapping = aes(x = lag, y = acf)) +
-    geom_hline(aes(yintercept = 0)) +
-    geom_segment(mapping = aes(xend = lag, 
-                               yend = 0)) +
-    labs(y= label) +
-    geom_hline(aes(yintercept = lim1), 
-               linetype = 2,
-               color = "blue") +
-    geom_hline(aes(yintercept = lim0), 
-               linetype = 2, 
-               color = "blue") 
-  
-  ggplotly(p) 
+  price_dat %>% 
+    filter(date >= start_date) %>%
+    add_macd(ema_short = ema_short, 
+             ema_long = ema_long, 
+             signal = macd_signal) %>%
+    get_macd_signals() %>% 
+    add_rsi(rsi_period = rsi_period) %>% 
+    get_rsi_signals()
   
 }
 
-plot_predictions <- function(pred_dat, start_date, ticker){
-  "Return a chart with observed and predicted values over last months."
+## Potential buying points ------------------------------------------------------------------
+
+return_buying_points <- function(indicators_dat, criterion = "MACD"){
+  "Return buying points based on a criterion (MACD, RSI, both)."
   
-  if (ticker != "All"){
-    title <- get_indicator_plot_title(ticker = ticker, 
-                                      indicator_type = "5-day Stock Prediction")
-    pred_dat <- pred_dat %>%
-      filter(date >= start_date) %>%
-      mutate(pred_value = ifelse(date >= today() - days(1), 
-                                 close, 
-                                 NA), 
-             value = ifelse(date >= today(), 
-                            NA, 
-                            close)) 
+  if (criterion == "MACD"){
+    buying_dat <- indicators_dat %>% 
+      filter(MACDBuy == 1) %>% 
+      select(date:MACDHist)
   }
+  
   else{
-    title <- "5-day Portfolio Value Prediction"
-    pred_dat <- pred_dat %>%
-      filter(date >= start_date) %>%
-      mutate(pred_value = ifelse(date >= today() - days(1), 
-                                 value, 
-                                 NA), 
-             value = ifelse(date >= today(), 
-                            NA, 
-                            value)) 
+    
+    if (criterion == "RSI"){
+      buying_dat <- indicators_dat %>% 
+        filter(RSIBuy == 1) %>% 
+        select(c(date:adjusted, RSI))
+    }
+    
+    else{
+      
+      if (criterion == "MACD+RSI"){
+        buying_dat <- indicators_dat %>%
+          filter(MACDBuy == 1 & RSIBuy == 1) %>% 
+          select(c(date:MACDHist, RSI))
+      }
+      
+      else{
+        stop("'criterion' must take on of the following values: 'MACD', 'RSI', 'MACD+RSI'.")
+      }
+      
+    }
+    
   }
   
-  pred_dat %>%
-    plot_ly() %>%
-    add_trace(type = "scatter", 
-              mode = "lines",
-              marker = NULL,
-              x = ~date,
-              y = ~value,
-              name = "Observed",
-              line = list(width = 1.7, 
-                          color = evolution)) %>%
-    add_trace(type = "scatter", 
-              mode = "lines",
-              marker = NULL,
-              x = ~date,
-              y = ~pred_value,
-              name = "Predicted",
-              line = list(width = 1.7, 
-                          color = pred, 
-                          dash = "dot")) %>%
-    plotly_layout(title = title, 
-                  title.y = "Value (€)", 
-                  range_selector = F) 
+  return(buying_dat)
   
 }
 
-# ----- UI -----
+return_last_signal_point <- function(signal_points_dat){
+  "Return the last buying point for a given stock."
+  signal_points_dat %>% 
+    filter(date == today())
+}
+
+
+## Potential selling points -----------------------------------------------------------------
+
+return_selling_points <- function(indicators_dat, criterion = "MACD"){
+  "Return selling points based on a criterion (MACD, RSI, both)."
+  
+  if (criterion == "MACD"){
+    buying_dat <- indicators_dat %>% 
+      filter(MACDSell == 1) %>% 
+      select(date:MACDHist)
+  }
+  
+  else{
+    
+    if (criterion == "RSI"){
+      buying_dat <- indicators_dat %>% 
+        filter(RSISell == 1) %>% 
+        select(c(date:adjusted, RSI))
+    }
+    
+    else{
+      
+      if (criterion == "MACD+RSI"){
+        buying_dat <- indicators_dat %>%
+          filter(MACDSell == 1 & RSISell == 1) %>% 
+          select(c(date:MACDHist, RSI))
+      }
+      
+      else{
+        stop("'criterion' must take on of the following values: 'MACD', 'RSI', 'MACD+RSI'.")
+      }
+      
+    }
+    
+  }
+  
+  return(buying_dat)
+  
+}
+
+add_returns <- function(
+  selling_points_dat,
+  buying_date, 
+  num_shares
+){
+  "Add global returns for selling points."
+  ticker <- selling_points_dat %>%
+    pull(ticker) %>% 
+    unique()
+  buying_val <- yf_data[[ticker]] %>%
+    filter(date == buying_date) %>% 
+    pull(close)
+  
+  selling_points_dat %>% 
+    filter(date >= buying_date) %>% 
+    mutate( returns = calculate_total_returns(p0 = buying_val*num_shares, p1 = close*num_shares) )
+
+}
+
+## Stock recommendation process -------------------------------------------------------
+
+stock_recommender <- function(
+  stock_data, 
+  start_date, 
+  action = "Buy", 
+  ema_short = 12, 
+  ema_long = 26, 
+  macd_signal = 9, 
+  rsi_period = 10, 
+  criterion = "MACD",
+  num_shares = NULL,  
+  buying_dates = NULL
+){
+  "Build the recommendation system."
+  process <- function(indicators_dat, ticker){
+    
+    if (action == "Buy"){
+      
+      dat <- indicators_dat %>%
+        return_buying_points(criterion = criterion) %>% 
+        return_last_signal_point()
+      
+      return(dat)
+    }
+    
+    else{
+      if (action == "Sell"){
+        
+        if (nrow(indicators_dat) > 0){
+          ticker <- indicators_dat %>% 
+            head(1) %>% 
+            pull(ticker)
+        }
+        
+        if (ticker %in% my_tickers){
+          dat <- indicators_dat %>%
+            return_selling_points(criterion = criterion) 
+          
+          if (nrow(dat) > 0){
+            dat <- dat %>% 
+              add_returns(buying_date = buying_dates[ticker], 
+                          num_shares = num_shares[ticker]) %>% 
+              return_last_signal_point()
+            return(dat)
+          }
+        }
+        
+      }
+      
+      else{
+        stop("'action' must take one of the following values: 'Buy', 'Sell'.")
+      }
+      
+    }
+    
+  }
+  
+  dat <- lapply(X = stock_data, 
+                FUN = function(dat){
+                  ticker <- dat %>% 
+                    head(1) %>% 
+                    pull(ticker)
+                  dat %>%
+                    add_indicators(start_date = start_date, 
+                                   ema_short = ema_short, 
+                                   ema_long = ema_long, 
+                                   macd_signal = macd_signal, 
+                                   rsi_period = rsi_period) %>%
+                    process(ticker = ticker)
+                }) %>% 
+    bind_rows()
+  
+  if (ncol(dat) == 0){
+    dat <- data.frame(date = as.Date(as.character()),
+                      open = as.numeric(), 
+                      high = as.numeric(), 
+                      low = as.numeric(), 
+                      close = as.numeric(),
+                      volume = as.numeric(),
+                      adjusted = as.numeric()) 
+  }
+  
+  return(dat)
+}
+
+# UI -------------------------------------------------------
 
 infoBox_dims <- function(
   box_height = "35px",
@@ -1541,6 +1663,7 @@ asset_inputs <- function(
   dateInputId <- paste("buying_date", get_ticker(asset), sep = "_")
   
   fluidRow(
+    style = "height:80px;", 
     column(width = 6, 
            numericInput(numInputId,
                         label = h5("Number of shares"), 

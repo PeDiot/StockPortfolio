@@ -3,8 +3,10 @@ ui <- fluidPage(
   useShinydashboard(), 
   html_dependency_awesome(),
   
-  tags$head(tags$style(infoBox_dims())),
-  
+  tags$head(
+    tags$style(infoBox_dims())
+  ),
+ 
   navbarPage("Your Stock Portfolio", 
              theme = shinytheme("lumen"), 
              
@@ -77,8 +79,10 @@ ui <- fluidPage(
 ## inputs ---------------------------------------------------------
                         sidebarPanel( 
                           width = 3, 
-                          h3(strong("Your portfolio")), 
+                          h4(strong("Your portfolio"),
+                             style = "color:#76787B;"), 
                           hr(),
+                          tags$head(tags$style("h5 {color:#76787B;}")),
                           h5(strong("Bitcoin")), 
                           asset_inputs(asset = "Bitcoin", 
                                        val = 0.00037241, 
@@ -95,12 +99,14 @@ ui <- fluidPage(
                           asset_inputs(asset = "Decentraland (MANA)", 
                                        val = 5.77722346, 
                                        buying_date = "2022-03-02"), 
-                          br(), 
-                          hr(), 
-                          p(a(href = "https://github.com/PeDiot/StockPortfolio", 
-                              target = "_blank",
-                              icon("github")), 
-                            " Feel free to modify the source code to select your own assets.")
+                          h5(strong("Coinbase")), 
+                          asset_inputs(asset = "Coinbase", 
+                                       val = 0.10934065, 
+                                       buying_date = "2022-03-29"),
+                          h5(strong("Amazon")), 
+                          asset_inputs(asset = "Amazon", 
+                                       val = 0.00790615, 
+                                       buying_date = "2022-04-08")
                         ), 
                         
                         mainPanel(
@@ -124,16 +130,18 @@ ui <- fluidPage(
 ## portfolio composition ---------------------------------------------------------
                               tabPanel("Composition",
                                      br(), 
-                                     h4("Contribution of each asset to the portfolio value", 
-                                        align = "center"),
+                                     h4(strong("Contribution of each asset to the portfolio value"), 
+                                        align = "center", 
+                                        style = "color:#76787B;"),
                                      div(plotlyOutput("portfolio_composition", 
                                                       height = 500, 
                                                       width = 800), 
                                          align = "center"), 
                                      br(),
                                      hr(), 
-                                     h4("Your best and worst assets", 
-                                        align = "center"),
+                                     h4(strong("Your best and worst assets"), 
+                                        align = "center", 
+                                        style = "color:#76787B;"),
                                      br(), 
                                      fluidRow(column(width = 2), 
                                               infoBoxOutput("best_asset_cumret"),
@@ -164,14 +172,17 @@ ui <- fluidPage(
                         ## inputs ---------------------------------------------------------
                         sidebarPanel(
                           width = 3, 
-                          h3(strong("Stock monitoring")), 
+                          h4(strong("Stock Analysis"), 
+                             style = "color:#76787B;"), 
                           hr(), 
                           br(), 
-                          pickerInput("ticker", 
-                                      label = h4("Which asset?"), 
+                          pickerInput("ticker_fin_analysis", 
+                                      label = h5("Which asset?", 
+                                                 style = "color:#76787B;"), 
                                       width = "200px", 
-                                      choices = list(Stocks = stock_tickers,
-                                                     Cryptocurrencies = crypto_tickers), 
+                                      choices = list(Cryptocurrencies = crypto_tickers,
+                                                     Stocks = stock_tickers,
+                                                     ETFs = etf_tickers), 
                                       choicesOpt = list(style = picker_inputs_font_weight()),
                                       multiple = F, 
                                       options = list(`live-search` = TRUE)),
@@ -180,16 +191,7 @@ ui <- fluidPage(
                           br(), 
                           br(), 
                           br(), 
-                          airDatepickerInput(
-                            inputId = "buy_date",
-                            label = h4("How far back do you want to go?"),
-                            value = today() - months(6),
-                            minDate = date_init, 
-                            maxDate = today() - days(35),
-                            width = "200px",
-                            placeholder = "",
-                            multiple = F, 
-                            clearButton = F)
+                          uiOutput(outputId = "start_date_fin_analysis_out")
                         ),
                         
                         ## financial data viz ---------------------------------------------------------
@@ -275,7 +277,7 @@ ui <- fluidPage(
              ), 
 
 # data ---------------------------------------------------------
-             tabPanel(
+              tabPanel(
                "Data", 
                fluid = TRUE, 
                icon = icon("database"), 
@@ -283,14 +285,17 @@ ui <- fluidPage(
                sidebarLayout(
                  sidebarPanel(
                    width = 3, 
-                   h3(strong("Financial data collection")),
+                   h4(strong("Financial data collection", 
+                             style = "color:#76787B;")),
                    hr(), 
                    br(), 
                    pickerInput("ticker_dat", 
-                               label = h4("Which asset?"), 
+                               label = h5("Which asset?", 
+                                          style = "color:#76787B;"), 
                                width = "200px", 
-                               choices = list(Stocks = stock_tickers,
-                                              Cryptocurrencies = crypto_tickers), 
+                               choices = list(Cryptocurrencies = crypto_tickers,
+                                              Stocks = stock_tickers,
+                                              ETFs = etf_tickers), 
                                choicesOpt = list(style = picker_inputs_font_weight()),
                                multiple = F, 
                                options = list(`live-search` = TRUE)),
@@ -300,16 +305,7 @@ ui <- fluidPage(
                    br(), 
                    br(), 
                    br(), 
-                   airDatepickerInput(
-                     inputId = "dat_start_date",
-                     label = h4("How far back do you want to go?"),
-                     value = today() - months(6),
-                     minDate = date_init, 
-                     maxDate = today(),
-                     width = "200px", 
-                     placeholder = "",
-                     multiple = F, 
-                     clearButton = F), 
+                   uiOutput(outputId = "start_date_dat_out"),
                    br(), 
                    br(), 
                    br(), 
@@ -341,13 +337,101 @@ ui <- fluidPage(
                      tabPanel("Indicators", 
                               br(),
                               dataTableOutput(outputId = "indicators_data"))
-                   ) 
+                   ), 
+                  
                  )
                  
                )
                
-             )
-             
+             ), 
+
+# Stock recommender ---------------------------------------------------
+              tabPanel(
+                "Stock Recommendation", 
+                fluid = TRUE, 
+                icon = icon("check"), 
+                
+                sidebarLayout(
+                  sidebarPanel(
+                    width = 3, 
+                    h4(strong("Stock recommendation system", 
+                              style = "color:#76787B;")),
+                    p("Stock selection is based on the ",
+                      a(href = "https://www.investopedia.com/terms/r/rsi.asp",
+                        target = "_blank",
+                        "RSI"), 
+                      " and ", 
+                      a(href = "https://www.investopedia.com/terms/m/macd.asp",
+                        target = "_blank",
+                        "MACD"), 
+                      " indicators, as well as on ", 
+                      a(href = "https://www.investopedia.com/terms/m/movingaverage.asp#:~:text=In%20finance%2C%20a%20moving%20average,a%20constantly%20updated%20average%20price.",
+                        target = "_blank",
+                        "moving average", ),
+                      " computations.", 
+                      style = "color:#76787B;"), 
+                    hr(), 
+                    pickerInput(inputId = "action", 
+                                label = h5("Which action?", 
+                                           style = "color:#76787B;"), 
+                                width = "200px", 
+                                choices = c("Buy", "Sell"),
+                                selected = "Buy", 
+                                multiple = F), 
+                    br(), 
+                    br(), 
+                    br(), 
+                    pickerInput("indicator", 
+                                label = h5("Which indicator?", 
+                                           style = "color:#76787B;"), 
+                                width = "200px", 
+                                choices = c("MACD", "RSI"),
+                                selected = "RSI", 
+                                multiple = T), 
+                    br(), 
+                    br(), 
+                    br(), 
+                    airDatepickerInput(
+                      inputId = "recommendation_start_date",
+                      label = h5("How far back do you want to go?", 
+                                 style = "color:#76787B;"),
+                      value = today() %m-% months(6),
+                      minDate = date_init, 
+                      maxDate = today() - days(101),
+                      width = "200px", 
+                      placeholder = "",
+                      multiple = F, 
+                      clearButton = F), 
+                    
+                  ), 
+
+                  mainPanel(
+                    br(),
+                    uiOutput(outputId = "recommendation_tab_title"),
+                    br(),  
+                    dataTableOutput(outputId = "recommendation_data"), 
+                    br(),
+                    hr(),
+                    br(),
+                    h4(strong("Cumulative returns"), 
+                       align = "center", 
+                       style = "color:#76787B;"),
+                    div(plotlyOutput("recommendation_chart", 
+                                     height = 350, 
+                                     width = 700), 
+                        align = "center")
+                  )
+                  
+                )
+                
+              ) 
+                           
   )
   
 )
+
+
+# User Authentication ---------------------------------------------------
+
+# ui <- secure_app(ui, theme = shinytheme("lumen"))
+

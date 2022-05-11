@@ -3,8 +3,7 @@
 # setwd("C:/Users/pemma/OneDrive/Bureau/StockPortfolio")
 
 source("Rpackages.R")
-source("setup.R", 
-       encoding = "UTF-8")
+source("setup.R", encoding = "UTF-8")
 
 # Data --------------------------------------------------------------------
 
